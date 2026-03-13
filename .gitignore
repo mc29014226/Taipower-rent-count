@@ -1,0 +1,7 @@
+node_modules/
+.env
+*.log
+,sed*
+backups/
+golem_memory/
+.DS_Store
