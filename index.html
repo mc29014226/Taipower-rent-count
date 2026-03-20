@@ -127,10 +127,27 @@
             const room = loc?.rooms.find(r => r.id === roomId);
             
             if (room && !isNaN(current)) {
-                room.lastKwh = current;
-                localStorage.setItem('tp_assets', JSON.stringify(assets));
-                alert('✅ 讀數已存檔，下次計算將以此為起點！');
-                location.reload();
+                const gasUrl = localStorage.getItem("tp_gas_url");
+                if (!gasUrl) { alert("❌ 請先在設定頁面配置 GAS URL"); return; }
+
+                const payload = {
+                    action: "sync",
+                    location: loc.name,
+                    room: room.name,
+                    lastKwh: last,
+                    currentKwh: current,
+                    amount: document.getElementById("resultDisplay")?.innerText || "0"
+                };
+
+                fetch(gasUrl, { method: "POST", body: JSON.stringify(payload) })
+                .then(() => {
+                    room.lastKwh = current;
+                    localStorage.setItem("tp_assets", JSON.stringify(assets));
+                    alert("✅ 雲端同步成功！本期讀數已存檔為下期起點。");
+                    location.reload();
+                })
+                .catch(err => alert("❌ 同步失敗: " + err));
+            }
             }
         }
 
