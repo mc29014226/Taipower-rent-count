@@ -1,13 +1,68 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-    <link rel="manifest" href="manifest.json">
     <meta charset="UTF-8">
-    <title>台電租屋電費計算 v2.1 | Pro</title>
-    <script src="https://cdn.tailwindcss.com">
-        
-        const assets = JSON.parse(localStorage.getItem('tp_assets') || '{"locations": []}');
-        
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>台電租屋電費計算 v3.0 | Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { transition: background-color 0.5s ease; }
+    </style>
+</head>
+<body class="bg-[#0f172a] text-white min-h-screen flex items-center justify-center p-4">
+    <div class="max-w-md w-full bg-slate-800 p-6 rounded-2xl shadow-2xl border border-slate-700">
+        <header class="flex justify-between items-center mb-6 border-b border-slate-700 pb-4">
+            <h1 class="text-xl font-black bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent italic">Taipower Pro</h1>
+            <a href="setup.html" class="text-xs text-slate-500 hover:text-cyan-400 transition-colors italic">⚙️ 設定參數</a>
+        </header>
+
+        <div class="space-y-4">
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-[10px] text-slate-500 mb-1 uppercase tracking-widest">房產地點</label>
+                    <select id="locationSelect" onchange="updateRoomOptions()" class="w-full p-2 bg-slate-700 rounded border border-slate-600 text-xs outline-none focus:border-cyan-500"></select>
+                </div>
+                <div>
+                    <label class="block text-[10px] text-slate-500 mb-1 uppercase tracking-widest">房間編號</label>
+                    <select id="roomSelect" class="w-full p-2 bg-slate-700 rounded border border-slate-600 text-xs outline-none focus:border-cyan-500"></select>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-between bg-slate-700/50 p-3 rounded-lg border border-slate-600">
+                <span class="text-sm text-slate-300">夏月電價 (6/1 - 9/30)</span>
+                <input id="isSummer" type="checkbox" class="w-5 h-5 accent-cyan-500" checked>
+            </div>
+
+            <div>
+                <label class="block text-xs text-slate-400 mb-1">本期總用電度數</label>
+                <input id="kwh" type="number" placeholder="請輸入度數" class="w-full p-3 bg-slate-700 rounded-lg border border-slate-600 focus:border-cyan-500 outline-none text-xl font-mono">
+            </div>
+
+            <button onclick="calculate()" class="w-full bg-cyan-600 p-3 rounded-xl font-bold hover:bg-cyan-500 transform active:scale-95 transition-all shadow-lg shadow-cyan-900/20">立即計算費用</button>
+
+            <div id="resultCard" class="hidden space-y-3 pt-4 border-t border-slate-700">
+                <div class="text-center">
+                    <span class="text-slate-400 text-sm">預估應繳總額</span>
+                    <div id="totalAmount" class="text-4xl font-black text-cyan-400">$0</div>
+                </div>
+                <div id="detailBox" class="text-[10px] text-slate-500 font-mono bg-black/20 p-3 rounded-lg overflow-auto max-h-40"></div>
+                <button id="syncBtn" onclick="syncToGAS()" class="w-full bg-slate-700/80 p-2 rounded-lg text-xs font-bold hover:bg-slate-700 hover:text-white transition-all border border-slate-600 text-slate-400">☁️ 同步至雲端報表</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const RATES = [
+            { min: 0, max: 120, summer: 1.63, nonSummer: 1.63 },
+            { min: 120, max: 330, summer: 2.38, nonSummer: 2.10 },
+            { min: 330, max: 500, summer: 3.52, nonSummer: 2.89 },
+            { min: 500, max: 700, summer: 4.80, nonSummer: 3.94 },
+            { min: 700, max: 1000, summer: 5.83, nonSummer: 4.74 },
+            { min: 1000, max: Infinity, summer: 8.46, nonSummer: 6.63 }
+        ];
+
+        let assets = JSON.parse(localStorage.getItem('tp_assets') || '{"locations": []}');
+
         function updateRoomOptions() {
             const locId = document.getElementById('locationSelect').value;
             const roomSelect = document.getElementById('roomSelect');
@@ -19,203 +74,76 @@
             }
         }
 
-        function initAssets() {
+        function init() {
             const locSelect = document.getElementById('locationSelect');
-            if (assets.locations.length > 0) {
+            if (assets.locations && assets.locations.length > 0) {
                 locSelect.innerHTML = assets.locations.map(l => `<option value="${l.id}">${l.name}</option>`).join('');
                 updateRoomOptions();
             } else {
-                locSelect.innerHTML = '<option value="">未設定資產</option>';
+                locSelect.innerHTML = '<option value="">請先設定資產</option>';
             }
+            const config = JSON.parse(localStorage.getItem('tp_config') || '{}');
+            if (!config.gsUrl) document.getElementById('syncBtn').classList.add('hidden');
         }
 
-        // 覆蓋舊有的 calculate 以支援多房公設費
-        const baseCalculate = calculate;
-        calculate = function() {
+        function calculate() {
+            const k = parseFloat(document.getElementById('kwh').value) || 0;
+            const isSummer = document.getElementById('isSummer').checked;
             const locId = document.getElementById('locationSelect').value;
             const roomId = document.getElementById('roomSelect').value;
             const loc = assets.locations.find(l => l.id === locId);
             const room = loc?.rooms.find(r => r.id === roomId);
             
-            // 暫時將選定房號的公設費注入 localStorage 供原邏輯讀取
-            const tempConfig = JSON.parse(localStorage.getItem('tp_config') || '{}');
-            tempConfig.publicFee = room ? room.publicFee : 0;
-            localStorage.setItem('tp_config', JSON.stringify(tempConfig));
-            
-            baseCalculate();
-        };
+            let total = parseFloat(room?.publicFee || 0);
+            let details = `公設固定費用: $${total}<br>`;
 
-        // 升級同步函式包含房地資訊
+            RATES.forEach(tier => {
+                if (k > tier.min) {
+                    const range = Math.min(k, tier.max) - tier.min;
+                    const price = isSummer ? tier.summer : tier.nonSummer;
+                    const cost = range * price;
+                    total += cost;
+                    details += `級距 ${tier.min}-${tier.max === Infinity ? 'UP' : tier.max}: ${range.toFixed(0)}度 x $${price} = $${cost.toFixed(1)}<br>`;
+                }
+            });
+
+            document.body.style.backgroundColor = k > 1000 ? '#450a0a' : '#0f172a';
+            document.getElementById('resultCard').classList.remove('hidden');
+            document.getElementById('totalAmount').innerText = '$' + Math.round(total);
+            document.getElementById('detailBox').innerHTML = details;
+        }
+
         async function syncToGAS() {
             const k = document.getElementById('kwh').value;
-            const t = document.getElementById('totalAmount').innerText.replace('
-    </script>
-</head>
-<body class="bg-slate-900 text-white p-4 md:p-8">
-    <div class="max-w-md mx-auto bg-slate-800 p-6 rounded-2xl shadow-2xl border border-blue-500/30">
-        <h1 class="text-2xl font-bold mb-6 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-300">台電計費系統 v2.1</h1>
-        
-        <div class="space-y-6">
-            <div class="flex items-center justify-between bg-slate-700/50 p-3 rounded-lg border border-slate-600">
-                <span class="text-sm text-slate-300">夏月電價 (6/1 - 9/30)</span>
-                <input type="checkbox" id="isSummer" class="w-5 h-5 accent-blue-500 cursor-pointer">
-            </div>
-
-            <div>
-                <label class="block text-xs text-slate-400 mb-1">本期總用電度數</label>
-                <input id="kwh" type="number" placeholder="請輸入度數" class="w-full p-3 bg-slate-700 rounded-lg border border-slate-600 focus:border-blue-500 focus:outline-none transition-all text-xl">
-            </div>
-
-            <button onclick="calculate()" class="w-full bg-gradient-to-r from-blue-600 to-blue-500 p-3 rounded-lg font-bold hover:from-blue-500 hover:to-blue-400 transform active:scale-95 transition-all shadow-lg shadow-blue-900/20">立即計算</button>
-
-            <div id="resultCard" class="hidden space-y-3 pt-4 border-t border-slate-700">
-                <div class="text-center">
-                    <span class="text-slate-400 text-sm">預估應繳總額</span>
-                    <div id="totalAmount" class="text-4xl font-black text-blue-400">$0</div>
-                </div>
-                <div id="detailBox" class="text-xs text-slate-500 font-mono bg-black/20 p-3 rounded"></div>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
-        const config = JSON.parse(localStorage.getItem('tp_config') || '{}');
-        if (config.gsUrl) document.getElementById('syncBtn')?.classList.remove('hidden');
-        const config = JSON.parse(localStorage.getItem('tp_config') || '{}');
-        if (config.gsUrl) document.getElementById('syncBtn')?.classList.remove('hidden');
-        const RATES = [
-            { min: 0, max: 120, summer: 1.63, nonSummer: 1.63 },
-            { min: 120, max: 330, summer: 2.38, nonSummer: 2.10 },
-            { min: 330, max: 500, summer: 3.52, nonSummer: 2.89 },
-            { min: 500, max: 700, summer: 4.80, nonSummer: 3.94 },
-            { min: 700, max: 1000, summer: 5.83, nonSummer: 4.74 },
-            { min: 1000, max: Infinity, summer: 8.46, nonSummer: 6.63 }
-        ];
-
-        function calculate() {
-            const k = parseFloat(document.getElementById('kwh').value) || 0;
-            const isSummer = document.getElementById('isSummer').checked;
-            const config = JSON.parse(localStorage.getItem('tp_config') || '{}');
-            let total = parseFloat(config.publicFee || 0);
-            let details = '';
-
-            RATES.forEach(tier => {
-                if (k > tier.min) {
-                    const range = Math.min(k, tier.max) - tier.min;
-                    const price = isSummer ? tier.summer : tier.nonSummer;
-                    const cost = range * price;
-                    total += cost;
-                    if (k > 1000) document.body.style.background = '#450a0a'; else document.body.style.background = '#0f172a';
-                    details += `級距 ${tier.min}-${tier.max === Infinity ? 'UP' : tier.max}: ${range.toFixed(0)}度 x $${price} = $${cost.toFixed(1)}<br>`;
-                }
-            });
-
-            document.getElementById('resultCard').classList.remove('hidden');
-            document.getElementById('totalAmount').innerText = '$' + Math.round(total);
-            document.getElementById('detailBox').innerHTML = details;
-        }
-    </script>
-</body>
-</html>
-, '');
-            const btn = document.getElementById('syncBtn');
+            const t = document.getElementById('totalAmount').innerText.replace('$', '');
             const locId = document.getElementById('locationSelect').value;
             const roomId = document.getElementById('roomSelect').value;
             const loc = assets.locations.find(l => l.id === locId);
             const room = loc?.rooms.find(r => r.id === roomId);
-            
-            const cfg = JSON.parse(localStorage.getItem('tp_config') || '{}');
-            if(!cfg.gsUrl || !k) { alert('請完成設定並輸入度數'); return; }
-            
+            const btn = document.getElementById('syncBtn');
+            const config = JSON.parse(localStorage.getItem('tp_config') || '{}');
+
+            if (!config.gsUrl || !k) { alert('請檢查度數與設定參數'); return; }
+
             btn.disabled = true; btn.innerText = '📡 同步中...';
             try {
-                await fetch(cfg.gsUrl, { 
-                    method: 'POST', 
-                    mode: 'no-cors', 
-                    body: JSON.stringify({ 
-                        date: new Date().toLocaleDateString(), 
-                        location: loc ? loc.name : 'Unknown', 
-                        room: room ? room.name : 'Unknown', 
-                        kwh: k, 
-                        total: t 
-                    }) 
+                await fetch(config.gsUrl, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    body: JSON.stringify({
+                        date: new Date().toLocaleDateString(),
+                        location: loc ? loc.name : 'Unknown',
+                        room: room ? room.name : 'Unknown',
+                        kwh: k,
+                        total: t
+                    })
                 });
-                alert('✅ 同步成功 (' + (room ? room.name : '') + ')');
-            } catch(e) { alert('❌ 失敗: ' + e.message); } 
-            finally { btn.disabled = false; btn.innerText = '☁️ 同步至雲端'; }
+                alert('✅ 同步成功 (' + (room ? room.name : '系統') + ')');
+            } catch (e) { alert('❌ 同步失敗: ' + e.message); }
+            finally { btn.disabled = false; btn.innerText = '☁️ 同步至雲端報表'; }
         }
 
-        window.addEventListener('DOMContentLoaded', () => {
-            initAssets();
-            document.getElementById('syncBtn')?.addEventListener('click', syncToGAS);
-        });
-    </script>
-</head>
-<body class="bg-slate-900 text-white p-4 md:p-8">
-    <div class="max-w-md mx-auto bg-slate-800 p-6 rounded-2xl shadow-2xl border border-blue-500/30">
-        <h1 class="text-2xl font-bold mb-6 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-300">台電計費系統 v2.1</h1>
-        
-        <div class="space-y-6">
-            <div class="flex items-center justify-between bg-slate-700/50 p-3 rounded-lg border border-slate-600">
-                <span class="text-sm text-slate-300">夏月電價 (6/1 - 9/30)</span>
-                <input type="checkbox" id="isSummer" class="w-5 h-5 accent-blue-500 cursor-pointer">
-            </div>
-
-            <div>
-                <label class="block text-xs text-slate-400 mb-1">本期總用電度數</label>
-                <input id="kwh" type="number" placeholder="請輸入度數" class="w-full p-3 bg-slate-700 rounded-lg border border-slate-600 focus:border-blue-500 focus:outline-none transition-all text-xl">
-            </div>
-
-            <button onclick="calculate()" class="w-full bg-gradient-to-r from-blue-600 to-blue-500 p-3 rounded-lg font-bold hover:from-blue-500 hover:to-blue-400 transform active:scale-95 transition-all shadow-lg shadow-blue-900/20">立即計算</button>
-
-            <div id="resultCard" class="hidden space-y-3 pt-4 border-t border-slate-700">
-                <div class="text-center">
-                    <span class="text-slate-400 text-sm">預估應繳總額</span>
-                    <div id="totalAmount" class="text-4xl font-black text-blue-400">$0</div>
-                </div>
-                <div id="detailBox" class="text-xs text-slate-500 font-mono bg-black/20 p-3 rounded"></div>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
-        const config = JSON.parse(localStorage.getItem('tp_config') || '{}');
-        if (config.gsUrl) document.getElementById('syncBtn')?.classList.remove('hidden');
-        const config = JSON.parse(localStorage.getItem('tp_config') || '{}');
-        if (config.gsUrl) document.getElementById('syncBtn')?.classList.remove('hidden');
-        const RATES = [
-            { min: 0, max: 120, summer: 1.63, nonSummer: 1.63 },
-            { min: 120, max: 330, summer: 2.38, nonSummer: 2.10 },
-            { min: 330, max: 500, summer: 3.52, nonSummer: 2.89 },
-            { min: 500, max: 700, summer: 4.80, nonSummer: 3.94 },
-            { min: 700, max: 1000, summer: 5.83, nonSummer: 4.74 },
-            { min: 1000, max: Infinity, summer: 8.46, nonSummer: 6.63 }
-        ];
-
-        function calculate() {
-            const k = parseFloat(document.getElementById('kwh').value) || 0;
-            const isSummer = document.getElementById('isSummer').checked;
-            const config = JSON.parse(localStorage.getItem('tp_config') || '{}');
-            let total = parseFloat(config.publicFee || 0);
-            let details = '';
-
-            RATES.forEach(tier => {
-                if (k > tier.min) {
-                    const range = Math.min(k, tier.max) - tier.min;
-                    const price = isSummer ? tier.summer : tier.nonSummer;
-                    const cost = range * price;
-                    total += cost;
-                    if (k > 1000) document.body.style.background = '#450a0a'; else document.body.style.background = '#0f172a';
-                    details += `級距 ${tier.min}-${tier.max === Infinity ? 'UP' : tier.max}: ${range.toFixed(0)}度 x $${price} = $${cost.toFixed(1)}<br>`;
-                }
-            });
-
-            document.getElementById('resultCard').classList.remove('hidden');
-            document.getElementById('totalAmount').innerText = '$' + Math.round(total);
-            document.getElementById('detailBox').innerHTML = details;
-        }
+        window.onload = init;
     </script>
 </body>
 </html>
