@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>台電分攤系統 v4.0 | Pro Equity</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-[#020617] text-slate-200 min-h-screen flex items-center justify-center p-4">
+    <div class="max-w-md w-full bg-slate-900 p-6 rounded-3xl shadow-2xl border border-slate-800">
+        <header class="flex justify-between items-center mb-6 border-b border-slate-800 pb-4">
+            <h1 class="text-xl font-black bg-gradient-to-r from-emerald-400 to-cyan-500 bg-clip-text text-transparent italic">EQUITY PRO v4</h1>
+            <a href="setup.html" class="text-[10px] text-slate-500 hover:text-emerald-400 transition-colors">⚙️ 設定資產</a>
+        </header>
+
+        <div class="space-y-4">
+            
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-[10px] text-slate-500 mb-1 uppercase tracking-widest">房產地點</label>
+                    <select id="locationSelect" onchange="updateRoomOptions()" class="w-full p-2 bg-slate-800 rounded-lg border border-slate-700 text-xs outline-none focus:border-emerald-500 transition-all"></select>
+                </div>
+                <div>
+                    <label class="block text-[10px] text-slate-500 mb-1 uppercase tracking-widest">房間編號</label>
+                    <select id="roomSelect" onchange="loadLastReading()" class="w-full p-2 bg-slate-800 rounded-lg border border-slate-700 text-xs outline-none focus:border-emerald-500 transition-all"></select>
+                </div>
+            </div>
+
+            
+            <div class="p-3 bg-emerald-500/5 rounded-xl border border-emerald-500/10">
+                <h2 class="text-[10px] font-bold text-emerald-500/60 mb-2">台電帳單基準</h2>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <input id="billTotal" type="number" placeholder="帳單總金額" class="w-full p-2 bg-slate-950 rounded-lg border border-slate-800 text-xs focus:border-emerald-500 outline-none">
+                    </div>
+                    <div>
+                        <input id="billKwh" type="number" placeholder="帳單總度數" class="w-full p-2 bg-slate-950 rounded-lg border border-slate-800 text-xs focus:border-emerald-500 outline-none">
+                    </div>
+                </div>
+            </div>
+
+            
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-[10px] text-slate-500 mb-1 italic">上次讀數</label>
+                    <input id="lastReading" type="number" readonly class="w-full p-3 bg-slate-950 text-slate-500 rounded-xl border border-slate-900 text-lg font-mono cursor-not-allowed">
+                </div>
+                <div>
+                    <label class="block text-[10px] text-emerald-400 mb-1 font-bold">本次讀數</label>
+                    <input id="currentReading" type="number" placeholder="度數" class="w-full p-3 bg-slate-800 rounded-xl border border-slate-700 text-lg font-mono outline-none focus:border-emerald-500">
+                </div>
+            </div>
+
+            <button onclick="calculateEquity()" class="w-full bg-emerald-600 p-4 rounded-2xl font-black text-white hover:bg-emerald-500 transition-all shadow-lg shadow-emerald-900/20 active:scale-95">計算分攤金額</button>
+
+            <div id="resultCard" class="hidden space-y-3 pt-4 border-t border-slate-800">
+                <div class="flex justify-between items-end">
+                    <div>
+                        <span class="text-[10px] text-slate-500">本期分攤總額</span>
+                        <div id="finalAmount" class="text-4xl font-black text-emerald-400">$0</div>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-[10px] text-slate-500">用電量 Delta</span>
+                        <div id="usageText" class="text-lg font-bold text-white">0 kWh</div>
+                    </div>
+                </div>
+                <div id="detailBox" class="text-[9px] text-slate-500 font-mono bg-black/20 p-3 rounded-lg leading-relaxed"></div>
+                <button onclick="syncToGAS()" id="syncBtn" class="w-full py-2 bg-slate-800 rounded-lg text-[10px] font-bold text-slate-400 hover:text-white transition-all">☁️ 同步至雲端並更新歷史讀數</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let assets = JSON.parse(localStorage.getItem("tp_assets") || "{"locations": []}"););
+        if (!assets.locations) assets.locations = [];
+        function updateRoomOptions() {
+            const locId = document.getElementById('locationSelect').value;
+            const roomSelect = document.getElementById('roomSelect');
+            const loc = assets.locations.find(l => l.id === locId);
+            if (loc) {
+                roomSelect.innerHTML = loc.rooms.map(r => `<option value="${r.id}">${r.name}</option>`).join('');
+                loadLastReading();
+            }
+        }
+
+        function loadLastReading() {
+            const locId = document.getElementById('locationSelect').value;
+            const roomId = document.getElementById('roomSelect').value;
+            const loc = assets.locations.find(l => l.id === locId);
+            const room = loc?.rooms.find(r => r.id === roomId);
+            document.getElementById('lastReading').value = room?.lastKwh || 0;
+        }
+
+        function calculateEquity() {
+            const last = parseFloat(document.getElementById('lastReading').value) || 0;
+            const current = parseFloat(document.getElementById('currentReading').value) || 0;
+            const billTotal = parseFloat(document.getElementById('billTotal').value) || 0;
+            const billKwh = parseFloat(document.getElementById('billKwh').value) || 1;
+
+            if (current < last) { alert('數據異常：本次讀數低於上次！'); return; }
+            
+            const usage = current - last;
+            const unitPrice = billTotal / billKwh;
+            
+            const locId = document.getElementById('locationSelect').value;
+            const roomId = document.getElementById('roomSelect').value;
+            const loc = assets.locations.find(l => l.id === locId);
+            const room = loc?.rooms.find(r => r.id === roomId);
+            
+            const splitCost = usage * unitPrice;
+            const total = splitCost + (room?.publicFee || 0);
+
+            document.getElementById('resultCard').classList.remove('hidden');
+            document.getElementById('finalAmount').innerText = '$' + Math.round(total);
+            document.getElementById('usageText').innerText = usage.toFixed(1) + ' kWh';
+            document.getElementById('detailBox').innerHTML = `
+                分攤權重: ${usage.toFixed(1)} / ${billKwh} (${((usage/billKwh)*100).toFixed(1)}%)<br>
+                有效單價: $${unitPrice.toFixed(4)} / kWh<br>
+                公設固定費: $${room?.publicFee || 0}`;
+        }
+
+        async function syncToGAS() {
+            const locId = document.getElementById('locationSelect').value;
+            const roomId = document.getElementById('roomSelect').value;
+            const current = parseFloat(document.getElementById('currentReading').value);
+            const loc = assets.locations.find(l => l.id === locId);
+            const room = loc?.rooms.find(r => r.id === roomId);
+            
+            if (room && !isNaN(current)) {
+                const gasUrl = JSON.parse(localStorage.getItem("tp_config") || "{}").gsUrl;
+                if (!gasUrl) { alert("❌ 請先在設定頁面配置 GAS URL"); return; }
+
+                const payload = {
+                    action: "sync",
+                    location: loc.name,
+                    room: room.name,
+                    lastKwh: last,
+                    currentKwh: current,
+                    amount: document.getElementById("resultDisplay")?.innerText || "0"
+                };
+
+                fetch(gasUrl, { method: "POST", body: JSON.stringify(payload) })
+                .then(() => {
+                    room.lastKwh = current;
+                    localStorage.setItem("tp_assets", JSON.stringify(assets));
+                    alert("✅ 雲端同步成功！本期讀數已存檔為下期起點。");
+                    location.reload();
+                })
+                .catch(err => alert("❌ 同步失敗: " + err));
+            }
+            }
+        }
+
+        window.onload = () => {
+            console.log("--- Assets Initialization ---", assets);
+            const locSelect = document.getElementById("locationSelect");
+            const locations = assets.locations || [];
+            if (locations.length > 0) {
+                locSelect.innerHTML = locations.map(l => `<option value="${l.id}">${l.name}</option>`).join("");
+                updateRoomOptions();
+            } else {
+                locSelect.innerHTML = "<option value="">請至設定頁面建立資產</option>";
+            }
+        };
+    </script>
+</body>
+</html>
+/* Migration Bridge Mock Injection */

@@ -71,7 +71,206 @@
     </div>
 
     <script>
-        let assets = JSON.parse(localStorage.getItem("tp_assets") || "{"locations": []}");
+window.onload = () => {
+    const config = JSON.parse(localStorage.getItem("taipower_config") || "{}");
+    const rooms = JSON.parse(localStorage.getItem("taipower_rooms") || "[]");
+    const locationSelect = document.querySelector('select[label="房產地點"]') || document.querySelector('select');
+    if (config.location) {
+        locationSelect.innerHTML = `<option>${config.location}</option>`;
+    }
+    // 假設你有一個房間選擇器，這裡也一併初始化
+    calculate(); 
+};
+
+function calculate() {
+    const config = JSON.parse(localStorage.getItem("taipower_config") || "{}");
+    let total = parseFloat(config.publicFee) || 0;
+    const rooms = JSON.parse(localStorage.getItem("taipower_rooms") || "[]");
+    rooms.forEach(r => {
+        const used = (parseFloat(r.current) || 0) - (parseFloat(r.previous) || 0);
+        total += used * (parseFloat(config.ratePerUnit) || 0);
+    });
+    const resEl = document.getElementById("result");
+    if (resEl) resEl.innerText = `NT$ ${Math.round(total)}`;
+    if (total > 5000) document.body.style.backgroundColor = "#450a0a";
+}
+
+async function syncToGAS() {
+    const btn = document.getElementById("syncBtn");
+    btn.innerText = "同步中...";
+    try {
+        const resp = await fetch("https://script.google.com/macros/s/AKfycbzW-Cv2scTGNwTv68xGhIpvYy5m0Hfn-bwWsLeRKdIRLnPuaooK8jRS4uiy6WTQnW4aXg/exec", {
+            method: "POST",
+            body: localStorage.getItem("taipower_rooms")
+        });
+        if (resp.ok) alert("✅ 同步成功！");
+    } catch (e) {
+        alert("❌ 同步失敗：" + e.message);
+    } finally {
+        if (btn) btn.innerText = "同步至雲端";
+    }
+}
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-[#020617] text-slate-200 min-h-screen flex items-center justify-center p-4">
+    <div class="max-w-md w-full bg-slate-900 p-6 rounded-3xl shadow-2xl border border-slate-800">
+        <header class="flex justify-between items-center mb-6 border-b border-slate-800 pb-4">
+            <h1 class="text-xl font-black bg-gradient-to-r from-emerald-400 to-cyan-500 bg-clip-text text-transparent italic">EQUITY PRO v4</h1>
+            <a href="setup.html" class="text-[10px] text-slate-500 hover:text-emerald-400 transition-colors">⚙️ 設定資產</a>
+        </header>
+
+        <div class="space-y-4">
+            
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-[10px] text-slate-500 mb-1 uppercase tracking-widest">房產地點</label>
+                    <select id="locationSelect" onchange="updateRoomOptions()" class="w-full p-2 bg-slate-800 rounded-lg border border-slate-700 text-xs outline-none focus:border-emerald-500 transition-all"></select>
+                </div>
+                <div>
+                    <label class="block text-[10px] text-slate-500 mb-1 uppercase tracking-widest">房間編號</label>
+                    <select id="roomSelect" onchange="loadLastReading()" class="w-full p-2 bg-slate-800 rounded-lg border border-slate-700 text-xs outline-none focus:border-emerald-500 transition-all"></select>
+                </div>
+            </div>
+
+            
+            <div class="p-3 bg-emerald-500/5 rounded-xl border border-emerald-500/10">
+                <h2 class="text-[10px] font-bold text-emerald-500/60 mb-2">台電帳單基準</h2>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <input id="billTotal" type="number" placeholder="帳單總金額" class="w-full p-2 bg-slate-950 rounded-lg border border-slate-800 text-xs focus:border-emerald-500 outline-none">
+                    </div>
+                    <div>
+                        <input id="billKwh" type="number" placeholder="帳單總度數" class="w-full p-2 bg-slate-950 rounded-lg border border-slate-800 text-xs focus:border-emerald-500 outline-none">
+                    </div>
+                </div>
+            </div>
+
+            
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-[10px] text-slate-500 mb-1 italic">上次讀數</label>
+                    <input id="lastReading" type="number" readonly class="w-full p-3 bg-slate-950 text-slate-500 rounded-xl border border-slate-900 text-lg font-mono cursor-not-allowed">
+                </div>
+                <div>
+                    <label class="block text-[10px] text-emerald-400 mb-1 font-bold">本次讀數</label>
+                    <input id="currentReading" type="number" placeholder="度數" class="w-full p-3 bg-slate-800 rounded-xl border border-slate-700 text-lg font-mono outline-none focus:border-emerald-500">
+                </div>
+            </div>
+
+            <button onclick="calculateEquity()" class="w-full bg-emerald-600 p-4 rounded-2xl font-black text-white hover:bg-emerald-500 transition-all shadow-lg shadow-emerald-900/20 active:scale-95">計算分攤金額</button>
+
+            <div id="resultCard" class="hidden space-y-3 pt-4 border-t border-slate-800">
+                <div class="flex justify-between items-end">
+                    <div>
+                        <span class="text-[10px] text-slate-500">本期分攤總額</span>
+                        <div id="finalAmount" class="text-4xl font-black text-emerald-400">$0</div>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-[10px] text-slate-500">用電量 Delta</span>
+                        <div id="usageText" class="text-lg font-bold text-white">0 kWh</div>
+                    </div>
+                </div>
+                <div id="detailBox" class="text-[9px] text-slate-500 font-mono bg-black/20 p-3 rounded-lg leading-relaxed"></div>
+                <button onclick="syncToGAS()" id="syncBtn" class="w-full py-2 bg-slate-800 rounded-lg text-[10px] font-bold text-slate-400 hover:text-white transition-all">☁️ 同步至雲端並更新歷史讀數</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+function calculate() {
+    const config = JSON.parse(localStorage.getItem("taipower_config") || "{}");
+    let total = parseFloat(config.publicFee) || 0;
+    const rooms = JSON.parse(localStorage.getItem("taipower_rooms") || "[]");
+    rooms.forEach(r => {
+        const used = parseFloat(r.current) - parseFloat(r.previous);
+        total += used * parseFloat(config.ratePerUnit || 0);
+    });
+    document.getElementById("result").innerText = `NT$ ${Math.round(total)}`;
+    if (total > 5000) document.body.style.backgroundColor = "#450a0a";
+}
+async function syncToGAS() {
+    const btn = document.getElementById("syncBtn");
+    btn.innerText = "同步中...";
+    try {
+        const resp = await fetch("https://script.google.com/macros/s/AKfycbzW-Cv2scTGNwTv68xGhIpvYy5m0Hfn-bwWsLeRKdIRLnPuaooK8jRS4uiy6WTQnW4aXg/exec", {
+            method: "POST",
+            body: localStorage.getItem("taipower_rooms")
+        });
+        if (resp.ok) alert("✅ 同步成功！");
+    } catch (e) {
+        alert("❌ 同步失敗：" + e.message);
+    } finally {
+        btn.innerText = "同步至雲端";
+    }
+}
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-[#020617] text-slate-200 min-h-screen flex items-center justify-center p-4">
+    <div class="max-w-md w-full bg-slate-900 p-6 rounded-3xl shadow-2xl border border-slate-800">
+        <header class="flex justify-between items-center mb-6 border-b border-slate-800 pb-4">
+            <h1 class="text-xl font-black bg-gradient-to-r from-emerald-400 to-cyan-500 bg-clip-text text-transparent italic">EQUITY PRO v4</h1>
+            <a href="setup.html" class="text-[10px] text-slate-500 hover:text-emerald-400 transition-colors">⚙️ 設定資產</a>
+        </header>
+
+        <div class="space-y-4">
+            
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-[10px] text-slate-500 mb-1 uppercase tracking-widest">房產地點</label>
+                    <select id="locationSelect" onchange="updateRoomOptions()" class="w-full p-2 bg-slate-800 rounded-lg border border-slate-700 text-xs outline-none focus:border-emerald-500 transition-all"></select>
+                </div>
+                <div>
+                    <label class="block text-[10px] text-slate-500 mb-1 uppercase tracking-widest">房間編號</label>
+                    <select id="roomSelect" onchange="loadLastReading()" class="w-full p-2 bg-slate-800 rounded-lg border border-slate-700 text-xs outline-none focus:border-emerald-500 transition-all"></select>
+                </div>
+            </div>
+
+            
+            <div class="p-3 bg-emerald-500/5 rounded-xl border border-emerald-500/10">
+                <h2 class="text-[10px] font-bold text-emerald-500/60 mb-2">台電帳單基準</h2>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <input id="billTotal" type="number" placeholder="帳單總金額" class="w-full p-2 bg-slate-950 rounded-lg border border-slate-800 text-xs focus:border-emerald-500 outline-none">
+                    </div>
+                    <div>
+                        <input id="billKwh" type="number" placeholder="帳單總度數" class="w-full p-2 bg-slate-950 rounded-lg border border-slate-800 text-xs focus:border-emerald-500 outline-none">
+                    </div>
+                </div>
+            </div>
+
+            
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-[10px] text-slate-500 mb-1 italic">上次讀數</label>
+                    <input id="lastReading" type="number" readonly class="w-full p-3 bg-slate-950 text-slate-500 rounded-xl border border-slate-900 text-lg font-mono cursor-not-allowed">
+                </div>
+                <div>
+                    <label class="block text-[10px] text-emerald-400 mb-1 font-bold">本次讀數</label>
+                    <input id="currentReading" type="number" placeholder="度數" class="w-full p-3 bg-slate-800 rounded-xl border border-slate-700 text-lg font-mono outline-none focus:border-emerald-500">
+                </div>
+            </div>
+
+            <button onclick="calculateEquity()" class="w-full bg-emerald-600 p-4 rounded-2xl font-black text-white hover:bg-emerald-500 transition-all shadow-lg shadow-emerald-900/20 active:scale-95">計算分攤金額</button>
+
+            <div id="resultCard" class="hidden space-y-3 pt-4 border-t border-slate-800">
+                <div class="flex justify-between items-end">
+                    <div>
+                        <span class="text-[10px] text-slate-500">本期分攤總額</span>
+                        <div id="finalAmount" class="text-4xl font-black text-emerald-400">$0</div>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-[10px] text-slate-500">用電量 Delta</span>
+                        <div id="usageText" class="text-lg font-bold text-white">0 kWh</div>
+                    </div>
+                </div>
+                <div id="detailBox" class="text-[9px] text-slate-500 font-mono bg-black/20 p-3 rounded-lg leading-relaxed"></div>
+                <button onclick="syncToGAS()" id="syncBtn" class="w-full py-2 bg-slate-800 rounded-lg text-[10px] font-bold text-slate-400 hover:text-white transition-all">☁️ 同步至雲端並更新歷史讀數</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let assets = JSON.parse(localStorage.getItem("tp_assets") || "{"locations": []}"););
         if (!assets.locations) assets.locations = [];
         function updateRoomOptions() {
             const locId = document.getElementById('locationSelect').value;
@@ -165,3 +364,4 @@
     </script>
 </body>
 </html>
+/* Migration Bridge Mock Injection */
