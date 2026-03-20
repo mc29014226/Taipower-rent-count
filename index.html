@@ -347,21 +347,9 @@ async function syncToGAS() {
                 })
                 .catch(err => alert("❌ 同步失敗: " + err));
             }
-            }
-        }
-
-        window.onload = () => {
-            console.log("--- Assets Initialization ---", assets);
-            const locSelect = document.getElementById("locationSelect");
-            const locations = assets.locations || [];
-            if (locations.length > 0) {
-                locSelect.innerHTML = locations.map(l => `<option value="${l.id}">${l.name}</option>`).join("");
-                updateRoomOptions();
-            } else {
-                locSelect.innerHTML = "<option value="">請至設定頁面建立資產</option>";
-            }
-        };
     </script>
 </body>
 </html>
-/* Migration Bridge Mock Injection */
+    </script>
+</body>
+</html>
