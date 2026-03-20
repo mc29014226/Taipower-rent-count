@@ -71,7 +71,7 @@
     </div>
 
     <script>
-        let assets = JSON.parse(localStorage.getItem('tp_assets') || '{"locations": []}');
+        let assets = JSON.parse(localStorage.getItem("tp_assets") || '{"locations": []}');
 
         function updateRoomOptions() {
             const locId = document.getElementById('locationSelect').value;
@@ -127,7 +127,7 @@
             const room = loc?.rooms.find(r => r.id === roomId);
             
             if (room && !isNaN(current)) {
-                const gasUrl = localStorage.getItem("tp_gas_url");
+                const gasUrl = JSON.parse(localStorage.getItem("tp_config") || "{}").gsUrl;
                 if (!gasUrl) { alert("❌ 請先在設定頁面配置 GAS URL"); return; }
 
                 const payload = {
