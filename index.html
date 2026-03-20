@@ -71,8 +71,8 @@
     </div>
 
     <script>
-        let assets = JSON.parse(localStorage.getItem("tp_assets") || '{"locations": []}');
-
+        let assets = JSON.parse(localStorage.getItem("tp_assets") || "{"locations": []}");
+        if (!assets.locations) assets.locations = [];
         function updateRoomOptions() {
             const locId = document.getElementById('locationSelect').value;
             const roomSelect = document.getElementById('roomSelect');
@@ -152,12 +152,14 @@
         }
 
         window.onload = () => {
-            const locSelect = document.getElementById('locationSelect');
-            if (assets.locations.length > 0) {
-                locSelect.innerHTML = assets.locations.map(l => `<option value="${l.id}">${l.name}</option>`).join('');
+            console.log("--- Assets Initialization ---", assets);
+            const locSelect = document.getElementById("locationSelect");
+            const locations = assets.locations || [];
+            if (locations.length > 0) {
+                locSelect.innerHTML = locations.map(l => `<option value="${l.id}">${l.name}</option>`).join("");
                 updateRoomOptions();
             } else {
-                locSelect.innerHTML = '<option value="">請至設定頁面建立資產</option>';
+                locSelect.innerHTML = "<option value="">請至設定頁面建立資產</option>";
             }
         };
     </script>
