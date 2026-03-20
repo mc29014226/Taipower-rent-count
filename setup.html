@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>系統設定 | Taipower-rent-count</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-white p-8">
+    <div class="max-w-md mx-auto bg-slate-800 p-6 rounded-2xl border border-cyan-500/50 shadow-xl">
+        <h1 class="text-xl font-bold mb-6 text-cyan-400">⚙️ 參數設定中心</h1>
+        <div class="space-y-4">
+            <div>
+                <label class="block text-xs text-slate-400 mb-1">Google Sheets API URL</label>
+                <input id="gsUrl" type="text" class="w-full p-2 bg-slate-700 rounded border border-slate-600 focus:border-cyan-500 outline-none">
+            </div>
+            <div>
+                <label class="block text-xs text-slate-400 mb-1">公設固定費用 (月)</label>
+                <input id="publicFee" type="number" class="w-full p-2 bg-slate-700 rounded border border-slate-600 outline-none">
+            </div>
+            <button onclick="saveSettings()" class="w-full bg-cyan-600 p-3 rounded-lg font-bold hover:bg-cyan-500 transition-all">儲存設定</button>
+            <a href="index.html" class="block text-center text-sm text-slate-500 hover:text-white mt-4 underline">← 返回計算器</a>
+        </div>
+    </div>
+    <script>
+        function saveSettings() {
+            const config = {
+                gsUrl: document.getElementById('gsUrl').value,
+                publicFee: document.getElementById('publicFee').value
+            };
+            localStorage.setItem('tp_config', JSON.stringify(config));
+            alert('設定已儲存！');
+        }
+        window.onload = () => {
+            const saved = JSON.parse(localStorage.getItem('tp_config') || '{}');
+            document.getElementById('gsUrl').value = saved.gsUrl || '';
+            document.getElementById('publicFee').value = saved.publicFee || 0;
+        };
+    </script>
+</body>
+</html>
