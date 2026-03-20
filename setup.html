@@ -3,39 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>資產管理 | Taipower Management Pro</title>
+    <title>資產管理 | Taipower Pro Equity</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-950 text-slate-200 min-h-screen p-4 md:p-8 font-sans">
     <div class="max-w-4xl mx-auto">
         <header class="flex justify-between items-center mb-8 border-b border-slate-800 pb-4">
-            <h1 class="text-2xl font-black bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent italic">PRO SETUP</h1>
-            <a href="index.html" class="text-xs text-slate-500 hover:text-cyan-400 transition-colors">← 返回主計算器</a>
+            <h1 class="text-2xl font-black bg-gradient-to-r from-emerald-400 to-cyan-500 bg-clip-text text-transparent italic">PRO ASSETS v4</h1>
+            <a href="index.html" class="text-xs text-slate-500 hover:text-emerald-400 transition-colors">← 返回權重計算器</a>
         </header>
 
         <div class="grid md:grid-cols-3 gap-8">
-            
             <div class="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-2xl h-fit">
                 <h2 class="text-sm font-bold text-slate-400 mb-4 uppercase tracking-widest">全域設定</h2>
                 <div class="space-y-4">
                     <div>
                         <label class="block text-[10px] text-slate-500 mb-1">GAS API URL</label>
-                        <input id="globalGsUrl" type="text" class="w-full p-2 bg-slate-800 rounded-lg border border-slate-700 focus:border-cyan-500 outline-none text-xs transition-all">
+                        <input id="globalGsUrl" type="text" class="w-full p-2 bg-slate-800 rounded-lg border border-slate-700 focus:border-emerald-500 outline-none text-xs transition-all">
                     </div>
-                    <button onclick="saveGlobalConfig()" class="w-full bg-cyan-600/10 text-cyan-400 p-2 rounded-lg font-bold border border-cyan-600/30 hover:bg-cyan-600 hover:text-white transition-all text-xs">儲存全域參數</button>
+                    <button onclick="saveGlobalConfig()" class="w-full bg-emerald-600/10 text-emerald-400 p-2 rounded-lg font-bold border border-emerald-600/30 hover:bg-emerald-600 hover:text-white transition-all text-xs">儲存雲端參數</button>
                 </div>
             </div>
 
-            
             <div class="md:col-span-2 space-y-6">
                 <div class="flex justify-between items-center">
                     <h2 class="text-lg font-bold text-white">房產地點清單</h2>
-                    <button onclick="addLocation()" class="bg-blue-600 text-white px-4 py-1.5 rounded-full text-xs font-bold hover:bg-blue-500 transition-all">+ 新增地點</button>
+                    <button onclick="addLocation()" class="bg-emerald-600 text-white px-4 py-1.5 rounded-full text-xs font-bold hover:bg-emerald-500 transition-all">+ 新增地點</button>
                 </div>
-                
-                <div id="assetContainer" class="space-y-4">
-                    
-                </div>
+                <div id="assetContainer" class="space-y-4"></div>
             </div>
         </div>
     </div>
@@ -55,7 +50,7 @@
         }
 
         function addLocation() {
-            const name = prompt('請輸入地點名稱（如：板橋宿舍）：');
+            const name = prompt('請輸入地點名稱：');
             if (name) {
                 assets.locations.push({ id: crypto.randomUUID(), name, rooms: [] });
                 saveAssets();
@@ -63,17 +58,23 @@
         }
 
         function addRoom(locId) {
-            const name = prompt('請輸入房間編號（如：101）：');
-            const fee = prompt('請輸入公設費用：', '0');
+            const name = prompt('請輸入房號：');
+            const fee = prompt('請輸入每月公設費：', '0');
+            const lastKwh = prompt('請輸入目前電表起算讀數：', '0');
             if (name) {
                 const loc = assets.locations.find(l => l.id === locId);
-                loc.rooms.push({ id: crypto.randomUUID(), name, publicFee: parseFloat(fee) || 0 });
+                loc.rooms.push({ 
+                    id: crypto.randomUUID(), 
+                    name, 
+                    publicFee: parseFloat(fee) || 0,
+                    lastKwh: parseFloat(lastKwh) || 0
+                });
                 saveAssets();
             }
         }
 
         function deleteLocation(id) {
-            if (confirm('確定刪除此地點及其所有房間？')) {
+            if (confirm('確定刪除？')) {
                 assets.locations = assets.locations.filter(l => l.id !== id);
                 saveAssets();
             }
@@ -87,16 +88,19 @@
                         <span class="font-bold text-slate-200">${loc.name}</span>
                         <div class="flex gap-2">
                             <button onclick="addRoom('${loc.id}')" class="text-[10px] bg-slate-700 px-2 py-1 rounded hover:bg-slate-600 transition-all">新增房間</button>
-                            <button onclick="deleteLocation('${loc.id}')" class="text-[10px] text-red-500 px-2 py-1">刪除</button>
+                            <button onclick="deleteLocation('${loc.id}')" class="text-[10px] text-red-500 px-2 py-1">刪除地點</button>
                         </div>
                     </div>
                     <div class="p-4 space-y-2">
                         ${loc.rooms.map(room => `
                             <div class="flex justify-between items-center text-xs bg-slate-800/30 p-2 rounded-lg border border-slate-800">
-                                <span>房號: <b class="text-cyan-400">${room.name}</b></span>
-                                <span>公設: <b class="text-slate-400">$${room.publicFee}</b></span>
+                                <span>房號: <b class="text-emerald-400">${room.name}</b></span>
+                                <div class="flex gap-4">
+                                    <span>公設: <b class="text-slate-400">$${room.publicFee}</b></span>
+                                    <span>當前讀數: <b class="text-cyan-400">${room.lastKwh} kWh</b></span>
+                                </div>
                             </div>
-                        `).join('') || '<p class="text-[10px] text-slate-600 italic text-center py-2">尚無房間資料</p>'}
+                        `).join('') || '<p class="text-[10px] text-slate-600 italic text-center py-2">尚無房間</p>'}
                     </div>
                 </div>
             `).join('');
