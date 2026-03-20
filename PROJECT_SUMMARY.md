@@ -10,3 +10,4 @@
 - [ ] Test calculation with 2026 rates
 - [ ] Confirm localStorage sync via setup.html
 - 2026-03-20: v3.0.0-pro stable release. Full migration to hierarchical property management (tp_assets) and 2026 tariff dynamic alerts.
+- [Verified] Multi-room record tracking via lastKwh persistence.
