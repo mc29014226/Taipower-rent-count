@@ -1,0 +1,1 @@
+{ "name": "台電租屋電費計算器", "short_name": "電費計算", "start_url": "index.html", "display": "standalone", "background_color": "#0f172a", "theme_color": "#3b82f6", "icons": [{ "src": "https://cdn-icons-png.flaticon.com/512/3104/3104841.png", "sizes": "512x512", "type": "image/png" }] }
