@@ -5,9 +5,51 @@
     <meta charset="UTF-8">
     <title>台電租屋電費計算 v2.1 | Pro</title>
     <script src="https://cdn.tailwindcss.com">
+        
+        const assets = JSON.parse(localStorage.getItem('tp_assets') || '{"locations": []}');
+        
+        function updateRoomOptions() {
+            const locId = document.getElementById('locationSelect').value;
+            const roomSelect = document.getElementById('roomSelect');
+            const loc = assets.locations.find(l => l.id === locId);
+            if (loc && loc.rooms.length > 0) {
+                roomSelect.innerHTML = loc.rooms.map(r => `<option value="${r.id}">${r.name}</option>`).join('');
+            } else {
+                roomSelect.innerHTML = '<option value="">無房間</option>';
+            }
+        }
+
+        function initAssets() {
+            const locSelect = document.getElementById('locationSelect');
+            if (assets.locations.length > 0) {
+                locSelect.innerHTML = assets.locations.map(l => `<option value="${l.id}">${l.name}</option>`).join('');
+                updateRoomOptions();
+            } else {
+                locSelect.innerHTML = '<option value="">未設定資產</option>';
+            }
+        }
+
+        // 覆蓋舊有的 calculate 以支援多房公設費
+        const baseCalculate = calculate;
+        calculate = function() {
+            const locId = document.getElementById('locationSelect').value;
+            const roomId = document.getElementById('roomSelect').value;
+            const loc = assets.locations.find(l => l.id === locId);
+            const room = loc?.rooms.find(r => r.id === roomId);
+            
+            // 暫時將選定房號的公設費注入 localStorage 供原邏輯讀取
+            const tempConfig = JSON.parse(localStorage.getItem('tp_config') || '{}');
+            tempConfig.publicFee = room ? room.publicFee : 0;
+            localStorage.setItem('tp_config', JSON.stringify(tempConfig));
+            
+            baseCalculate();
+        };
+
+        // 升級同步函式包含房地資訊
         async function syncToGAS() {
             const k = document.getElementById('kwh').value;
-            const totalValue = document.getElementById('totalAmount').innerText.replace('
+            const t = document.getElementById('totalAmount').innerText.replace('
+    </script>
 </head>
 <body class="bg-slate-900 text-white p-4 md:p-8">
     <div class="max-w-md mx-auto bg-slate-800 p-6 rounded-2xl shadow-2xl border border-blue-500/30">
@@ -65,7 +107,6 @@
                     const cost = range * price;
                     total += cost;
                     if (k > 1000) document.body.style.background = '#450a0a'; else document.body.style.background = '#0f172a';
-                    if (k > 1000) document.body.style.background = '#450a0a'; else document.body.style.background = '#0f172a';
                     details += `級距 ${tier.min}-${tier.max === Infinity ? 'UP' : tier.max}: ${range.toFixed(0)}度 x $${price} = $${cost.toFixed(1)}<br>`;
                 }
             });
@@ -79,15 +120,36 @@
 </html>
 , '');
             const btn = document.getElementById('syncBtn');
-            const config = JSON.parse(localStorage.getItem('tp_config') || '{}');
-            if(!config.gsUrl || !k) { alert('請先完成設定並輸入度數'); return; }
+            const locId = document.getElementById('locationSelect').value;
+            const roomId = document.getElementById('roomSelect').value;
+            const loc = assets.locations.find(l => l.id === locId);
+            const room = loc?.rooms.find(r => r.id === roomId);
+            
+            const cfg = JSON.parse(localStorage.getItem('tp_config') || '{}');
+            if(!cfg.gsUrl || !k) { alert('請完成設定並輸入度數'); return; }
+            
             btn.disabled = true; btn.innerText = '📡 同步中...';
             try {
-                await fetch(config.gsUrl, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ date: new Date().toLocaleDateString(), kwh: k, total: totalValue }) });
-                alert('✅ 同步成功 (GAS已接收)');
-            } catch(e) { alert('❌ 同步失敗: ' + e.message); } finally { btn.disabled = false; btn.innerText = '☁️ 同步至雲端'; }
+                await fetch(cfg.gsUrl, { 
+                    method: 'POST', 
+                    mode: 'no-cors', 
+                    body: JSON.stringify({ 
+                        date: new Date().toLocaleDateString(), 
+                        location: loc ? loc.name : 'Unknown', 
+                        room: room ? room.name : 'Unknown', 
+                        kwh: k, 
+                        total: t 
+                    }) 
+                });
+                alert('✅ 同步成功 (' + (room ? room.name : '') + ')');
+            } catch(e) { alert('❌ 失敗: ' + e.message); } 
+            finally { btn.disabled = false; btn.innerText = '☁️ 同步至雲端'; }
         }
-        document.getElementById('syncBtn')?.addEventListener('click', syncToGAS);
+
+        window.addEventListener('DOMContentLoaded', () => {
+            initAssets();
+            document.getElementById('syncBtn')?.addEventListener('click', syncToGAS);
+        });
     </script>
 </head>
 <body class="bg-slate-900 text-white p-4 md:p-8">
