@@ -34,6 +34,7 @@
     </div>
 
     <script>
+        if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
         const config = JSON.parse(localStorage.getItem('tp_config') || '{}');
         if (config.gsUrl) document.getElementById('syncBtn')?.classList.remove('hidden');
         const config = JSON.parse(localStorage.getItem('tp_config') || '{}');
