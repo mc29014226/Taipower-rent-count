@@ -65,6 +65,7 @@
                     const cost = range * price;
                     total += cost;
                     if (k > 1000) document.body.style.background = '#450a0a'; else document.body.style.background = '#0f172a';
+                    if (k > 1000) document.body.style.background = '#450a0a'; else document.body.style.background = '#0f172a';
                     details += `級距 ${tier.min}-${tier.max === Infinity ? 'UP' : tier.max}: ${range.toFixed(0)}度 x $${price} = $${cost.toFixed(1)}<br>`;
                 }
             });
