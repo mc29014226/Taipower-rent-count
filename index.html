@@ -33,6 +33,10 @@
     </div>
 
     <script>
+        const config = JSON.parse(localStorage.getItem('tp_config') || '{}');
+        if (config.gsUrl) document.getElementById('syncBtn')?.classList.remove('hidden');
+        const config = JSON.parse(localStorage.getItem('tp_config') || '{}');
+        if (config.gsUrl) document.getElementById('syncBtn')?.classList.remove('hidden');
         const RATES = [
             { min: 0, max: 120, summer: 1.63, nonSummer: 1.63 },
             { min: 120, max: 330, summer: 2.38, nonSummer: 2.10 },
