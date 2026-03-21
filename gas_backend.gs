@@ -1,3 +1,5 @@
+const ADMIN_PASSWORD = "E220517781";
+
 function doGet(e) {
   const action = (e && e.parameter && e.parameter.action) ? e.parameter.action : "";
 
@@ -25,6 +27,10 @@ function doPost(e) {
     const body = JSON.parse(e.postData.contents || "{}");
     const action = body.action || "";
 
+    if (action === "saveAssets" || action === "saveMeterRecord") {
+      validateAdminPassword(body.adminPassword);
+    }
+
     if (action === "saveAssets") {
       const payload = Array.isArray(body.payload) ? body.payload : [];
       overwriteAssets(payload);
@@ -42,6 +48,16 @@ function doPost(e) {
       success: false,
       message: err && err.message ? err.message : String(err)
     });
+  }
+}
+
+function validateAdminPassword(inputPassword) {
+  const password = String(inputPassword == null ? "" : inputPassword).trim();
+  if (!password) {
+    throw new Error("缺少管理密碼");
+  }
+  if (password !== ADMIN_PASSWORD) {
+    throw new Error("管理密碼錯誤");
   }
 }
 
@@ -123,8 +139,6 @@ function saveMeterRecord(record) {
     currentKwh: safeNumber(record.currentKwh),
     usedKwh: safeNumber(record.usedKwh),
     billTotal: safeNumber(record.billTotal),
-    billKwh: safeNumber(record.billKwh),
-    unitPrice: safeNumber(record.unitPrice),
     publicFee: safeNumber(record.publicFee),
     usageAmount: safeNumber(record.usageAmount),
     tenantAmount: safeNumber(record.tenantAmount),
@@ -132,15 +146,9 @@ function saveMeterRecord(record) {
     createdAt: safeString(record.createdAt) || new Date().toISOString()
   };
 
-  if (!normalized.location) {
-    throw new Error("location 不可空白");
-  }
-  if (!normalized.room) {
-    throw new Error("room 不可空白");
-  }
-  if (!normalized.billGroup) {
-    throw new Error("billGroup 不可空白");
-  }
+  if (!normalized.location) throw new Error("location 不可空白");
+  if (!normalized.room) throw new Error("room 不可空白");
+  if (!normalized.billGroup) throw new Error("billGroup 不可空白");
 
   appendObjectByHeaders("meter_records", normalized);
   upsertLatestReading(normalized);
@@ -177,8 +185,13 @@ function upsertLatestReading(record) {
   for (let i = 1; i < values.length; i++) {
     const rowLocation = String(values[i][locationIdx] || "").trim();
     const rowRoom = String(values[i][roomIdx] || "").trim();
+    const rowBillGroup = String(values[i][billGroupIdx] || "").trim();
 
-    if (rowLocation === record.location && rowRoom === record.room && rowBillGroup === record.billGroup) {
+    if (
+      rowLocation === record.location &&
+      rowRoom === record.room &&
+      rowBillGroup === record.billGroup
+    ) {
       targetRow = i + 1;
       break;
     }
