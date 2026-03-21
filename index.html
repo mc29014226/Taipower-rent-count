@@ -7,104 +7,97 @@
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-100 text-slate-800 min-h-screen">
-  <div class="max-w-4xl mx-auto px-4 py-8">
+  <div class="max-w-6xl mx-auto px-4 py-8">
     <div class="bg-white rounded-2xl shadow-lg p-6 md:p-8">
       <div class="mb-8">
         <h1 class="text-2xl md:text-3xl font-bold text-slate-900">台電租屋公平分攤</h1>
-        <p class="text-slate-500 mt-2">依台電總帳單金額與總度數，自動計算各房租客應分攤金額。</p>
-
+        <p class="text-slate-500 mt-2">依同帳單群組內各房用電占比，分攤台電總金額。</p>
         <div class="mt-2 text-sm">
-          <a href="./setup.html" class="text-blue-600 hover:underline">
-            ⚙️ 設定 / 管理房間資料
-          </a>
+          <a href="./setup.html" class="text-blue-600 hover:underline">⚙️ 設定 / 管理房間資料</a>
         </div>
-        
       </div>
 
       <div id="statusBar" class="mb-6 hidden rounded-xl px-4 py-3 text-sm font-medium"></div>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
           <label class="block text-sm font-medium mb-2">地點</label>
-          <select id="locationSelect" class="w-full rounded-xl border border-slate-300 px-4 py-3 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
+          <select id="locationSelect" class="w-full rounded-xl border border-slate-300 px-4 py-3 bg-white">
             <option value="">請選擇地點</option>
           </select>
         </div>
 
         <div>
-          <label class="block text-sm font-medium mb-2">房號</label>
-          <select id="roomSelect" class="w-full rounded-xl border border-slate-300 px-4 py-3 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500" disabled>
+          <label class="block text-sm font-medium mb-2">帳單群組</label>
+          <select id="billGroupSelect" class="w-full rounded-xl border border-slate-300 px-4 py-3 bg-white" disabled>
             <option value="">請先選擇地點</option>
           </select>
         </div>
 
         <div>
-          <label class="block text-sm font-medium mb-2">上期度數</label>
-          <input id="previousKwh" type="number" min="0" step="1" class="w-full rounded-xl border border-slate-300 px-4 py-3 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-500" readonly />
-        </div>
-
-        <div>
-          <label class="block text-sm font-medium mb-2">本期度數</label>
-          <input id="currentKwh" type="number" min="0" step="1" class="w-full rounded-xl border border-slate-300 px-4 py-3 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500" placeholder="請輸入本期電表度數" />
-        </div>
-
-        <div>
           <label class="block text-sm font-medium mb-2">台電總金額</label>
-          <input id="billTotal" type="number" min="0" step="1" class="w-full rounded-xl border border-slate-300 px-4 py-3 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500" placeholder="例如 4200" />
+          <input id="billTotal" type="number" min="0" step="1" class="w-full rounded-xl border border-slate-300 px-4 py-3 bg-white" placeholder="例如 4200" />
         </div>
+      </div>
 
-        <div>
-          <label class="block text-sm font-medium mb-2">台電總度數</label>
-          <input id="billKwh" type="number" min="1" step="1" class="w-full rounded-xl border border-slate-300 px-4 py-3 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500" placeholder="例如 850" />
-        </div>
-
-        <div>  
-          <label class="block text-sm font-medium mb-2">公電費</label>
-          <input id="publicFee" type="number" min="0" step="1" class="w-full rounded-xl border border-slate-300 px-4 py-3 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500" placeholder="例如 100" />
-        </div>
-
-        <div>
-          <label class="block text-sm font-medium mb-2">備註</label>
-          <input id="remark" type="text" class="w-full rounded-xl border border-slate-300 px-4 py-3 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500" placeholder="可空白" />
-        </div>
+      <div class="mt-4">
+        <label class="block text-sm font-medium mb-2">備註</label>
+        <input id="remark" type="text" class="w-full rounded-xl border border-slate-300 px-4 py-3 bg-white" placeholder="可空白" />
       </div>
 
       <div class="mt-6 flex flex-wrap gap-3">
         <button id="calculateBtn" class="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-3 font-medium">
-          計算分攤
+          計算整組分攤
         </button>
         <button id="syncBtn" class="rounded-xl bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 font-medium">
-          同步抄表紀錄
+          同步整組抄表紀錄
         </button>
         <button id="reloadBtn" class="rounded-xl bg-slate-700 hover:bg-slate-800 text-white px-5 py-3 font-medium">
           重新載入資料
         </button>
       </div>
 
-      <div id="resultCard" class="mt-8 hidden rounded-2xl border border-emerald-200 bg-emerald-50 p-6">
-        <h2 class="text-xl font-bold text-emerald-900 mb-4">計算結果</h2>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm md:text-base">
-          <div class="bg-white rounded-xl p-4 border border-emerald-100">
-            <div class="text-slate-500">本期使用度數</div>
-            <div id="usedKwhText" class="text-2xl font-bold text-slate-900 mt-1">0 度</div>
-          </div>
-          <div class="bg-white rounded-xl p-4 border border-emerald-100">
-            <div class="text-slate-500">每度單價</div>
-            <div id="unitPriceText" class="text-2xl font-bold text-slate-900 mt-1">0 元</div>
-          </div>
-          <div class="bg-white rounded-xl p-4 border border-emerald-100">
-            <div class="text-slate-500">用電金額</div>
-            <div id="usageAmountText" class="text-2xl font-bold text-slate-900 mt-1">0 元</div>
-          </div>
-          <div class="bg-white rounded-xl p-4 border border-emerald-100">
-            <div class="text-slate-500">租客應繳總額</div>
-            <div id="tenantAmountText" class="text-2xl font-bold text-emerald-700 mt-1">0 元</div>
-          </div>
+      <div class="mt-8 border-t pt-6">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-xl font-bold text-slate-900">群組房間資料</h2>
+          <div class="text-sm text-slate-500">共 <span id="roomCountText">0</span> 間</div>
         </div>
 
-        <div class="mt-4 text-sm text-slate-600 leading-7">
-          <div>計算公式：<span class="font-medium">（台電總金額 ÷ 台電總度數）× 房間用電度數 + 公電費</span></div>
-          <div id="formulaDetail" class="mt-2"></div>
+        <div id="emptyGroupText" class="text-slate-400 text-sm">請先選擇地點與帳單群組</div>
+
+        <div id="groupTableWrap" class="hidden overflow-x-auto">
+          <table class="min-w-full border border-slate-200 rounded-xl overflow-hidden">
+            <thead class="bg-slate-100">
+              <tr>
+                <th class="text-left px-4 py-3 border-b">房號</th>
+                <th class="text-left px-4 py-3 border-b">上期度數</th>
+                <th class="text-left px-4 py-3 border-b">本期度數</th>
+                <th class="text-left px-4 py-3 border-b">本期使用度數</th>
+                <th class="text-left px-4 py-3 border-b">公電費</th>
+                <th class="text-left px-4 py-3 border-b">用電分攤金額</th>
+                <th class="text-left px-4 py-3 border-b">租客應繳總額</th>
+              </tr>
+            </thead>
+            <tbody id="groupTableBody" class="bg-white"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="summaryCard" class="mt-8 hidden rounded-2xl border border-emerald-200 bg-emerald-50 p-6">
+        <h2 class="text-xl font-bold text-emerald-900 mb-4">整組計算結果</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm md:text-base">
+          <div class="bg-white rounded-xl p-4 border border-emerald-100">
+            <div class="text-slate-500">帳單群組總用電</div>
+            <div id="groupTotalUsedText" class="text-2xl font-bold text-slate-900 mt-1">0 度</div>
+          </div>
+          <div class="bg-white rounded-xl p-4 border border-emerald-100">
+            <div class="text-slate-500">台電總金額</div>
+            <div id="billTotalText" class="text-2xl font-bold text-slate-900 mt-1">0 元</div>
+          </div>
+          <div class="bg-white rounded-xl p-4 border border-emerald-100">
+            <div class="text-slate-500">本組應收合計</div>
+            <div id="groupTenantTotalText" class="text-2xl font-bold text-emerald-700 mt-1">0 元</div>
+          </div>
         </div>
       </div>
     </div>
@@ -113,44 +106,43 @@
   <script>
     const GAS_URL = 'https://script.google.com/macros/s/AKfycbzW-Cv2scTGNwTv68xGhIpvYy5m0Hfn-bwWsLeRKdIRLnPuaooK8jRS4uiy6WTQnW4aXg/exec';
 
-    const STORAGE_KEYS = {
-      assets: 'assets',
-      latestReadings: 'latest_readings',
-      backupAssets: 'backup_assets'
-    };
-
     const state = {
       assets: [],
       latestReadings: [],
-      currentResult: null
+      selectedGroupRooms: [],
+      calculationResult: null
     };
 
     const el = {
       locationSelect: document.getElementById('locationSelect'),
-      roomSelect: document.getElementById('roomSelect'),
-      previousKwh: document.getElementById('previousKwh'),
-      currentKwh: document.getElementById('currentKwh'),
+      billGroupSelect: document.getElementById('billGroupSelect'),
       billTotal: document.getElementById('billTotal'),
-      billKwh: document.getElementById('billKwh'),
-      publicFee: document.getElementById('publicFee'),
       remark: document.getElementById('remark'),
       calculateBtn: document.getElementById('calculateBtn'),
       syncBtn: document.getElementById('syncBtn'),
       reloadBtn: document.getElementById('reloadBtn'),
-      resultCard: document.getElementById('resultCard'),
-      usedKwhText: document.getElementById('usedKwhText'),
-      unitPriceText: document.getElementById('unitPriceText'),
-      usageAmountText: document.getElementById('usageAmountText'),
-      tenantAmountText: document.getElementById('tenantAmountText'),
-      formulaDetail: document.getElementById('formulaDetail'),
-      statusBar: document.getElementById('statusBar')
+      statusBar: document.getElementById('statusBar'),
+      roomCountText: document.getElementById('roomCountText'),
+      emptyGroupText: document.getElementById('emptyGroupText'),
+      groupTableWrap: document.getElementById('groupTableWrap'),
+      groupTableBody: document.getElementById('groupTableBody'),
+      summaryCard: document.getElementById('summaryCard'),
+      groupTotalUsedText: document.getElementById('groupTotalUsedText'),
+      billTotalText: document.getElementById('billTotalText'),
+      groupTenantTotalText: document.getElementById('groupTenantTotalText')
     };
 
     function showStatus(message, type = 'info') {
-      el.statusBar.classList.remove('hidden', 'bg-blue-50', 'text-blue-700', 'bg-red-50', 'text-red-700', 'bg-emerald-50', 'text-emerald-700', 'bg-amber-50', 'text-amber-700');
+      el.statusBar.classList.remove(
+        'hidden',
+        'bg-blue-50', 'text-blue-700',
+        'bg-red-50', 'text-red-700',
+        'bg-green-50', 'text-green-700',
+        'bg-amber-50', 'text-amber-700'
+      );
 
       if (type === 'success') {
-        el.statusBar.classList.add('bg-emerald-50', 'text-emerald-700');
+        el.statusBar.classList.add('bg-green-50', 'text-green-700');
       } else if (type === 'error') {
         el.statusBar.classList.add('bg-red-50', 'text-red-700');
       } else if (type === 'warning') {
@@ -162,343 +154,351 @@
       el.statusBar.textContent = message;
     }
 
-    function saveLocalData() {
-      localStorage.setItem(STORAGE_KEYS.assets, JSON.stringify(state.assets));
-      localStorage.setItem(STORAGE_KEYS.latestReadings, JSON.stringify(state.latestReadings));
-      localStorage.setItem(STORAGE_KEYS.backupAssets, JSON.stringify(state.assets));
+    function normalizeAsset(item) {
+      return {
+        location: String(item.location || '').trim(),
+        room: String(item.room || '').trim(),
+        billGroup: String(item.billGroup || '').trim(),
+        lastKwh: Number(item.lastKwh || 0),
+        publicFee: Number(item.publicFee || 0)
+      };
     }
 
-    function loadLocalData() {
-      const assets = JSON.parse(localStorage.getItem(STORAGE_KEYS.assets) || localStorage.getItem(STORAGE_KEYS.backupAssets) || '[]');
-      const latestReadings = JSON.parse(localStorage.getItem(STORAGE_KEYS.latestReadings) || '[]');
-
-      state.assets = Array.isArray(assets) ? assets : [];
-      state.latestReadings = Array.isArray(latestReadings) ? latestReadings : [];
+    function normalizeLatest(item) {
+      return {
+        location: String(item.location || '').trim(),
+        room: String(item.room || '').trim(),
+        billGroup: String(item.billGroup || '').trim(),
+        currentKwh: Number(item.currentKwh || item.lastKwh || 0),
+        lastKwh: Number(item.lastKwh || 0),
+        updatedAt: String(item.updatedAt || '').trim()
+      };
     }
 
-  async function fetchJson(url) {
-    const response = await fetch(url, { method: 'GET' });
-    const text = await response.text();
+    async function fetchJson(url) {
+      const response = await fetch(url, { method: 'GET' });
+      const text = await response.text();
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status} | ${text.slice(0, 200)}`);
-    }
-
-    try {
-      return JSON.parse(text);
-    } catch (err) {
-      throw new Error(`JSON 解析失敗 | 回傳內容：${text.slice(0, 200)}`);
-    }
-  }
-
-    async function loadCloudData() {
-      if (!GAS_URL || GAS_URL === '你的 GAS Web App URL') {
-        loadLocalData();
-        showStatus('尚未設定 GAS_URL，目前使用本機資料。', 'warning');
-        renderLocations();
-        return;
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status} | ${text.slice(0, 200)}`);
       }
 
+      try {
+        return JSON.parse(text);
+      } catch {
+        throw new Error(`JSON 解析失敗 | 回傳內容：${text.slice(0, 200)}`);
+      }
+    }
+
+    async function loadCloudData() {
       try {
         const [assetsRes, latestRes] = await Promise.all([
           fetchJson(`${GAS_URL}?action=getAssets`),
           fetchJson(`${GAS_URL}?action=getLatestReadings`)
         ]);
 
-        const assets = Array.isArray(assetsRes.data) ? assetsRes.data : [];
-        const latestReadings = Array.isArray(latestRes.data) ? latestRes.data : [];
+        state.assets = Array.isArray(assetsRes.data) ? assetsRes.data.map(normalizeAsset) : [];
+        state.latestReadings = Array.isArray(latestRes.data) ? latestRes.data.map(normalizeLatest) : [];
 
-        state.assets = assets;
-        state.latestReadings = latestReadings;
-        saveLocalData();
-
+        renderLocations();
+        resetBillGroups();
+        clearGroupTable();
         showStatus('已成功從雲端載入資料。', 'success');
       } catch (error) {
-        loadLocalData();
-        showStatus(`雲端讀取失敗，已改用本機資料：${error.message}`, 'warning');
+        showStatus(`雲端讀取失敗：${error.message}`, 'error');
       }
-
-      renderLocations();
-    }
-
-    function normalizeAsset(item) {
-      return {
-        location: String(item.location || '').trim(),
-        room: String(item.room || '').trim(),
-        lastKwh: Number(item.lastKwh || item.previousKwh || 0),
-        publicFee: Number(item.publicFee || 0)
-      };
-    }
-
-    function getNormalizedAssets() {
-      return state.assets.map(normalizeAsset).filter(item => item.location && item.room);
     }
 
     function getUniqueLocations() {
-      return [...new Set(getNormalizedAssets().map(item => item.location))];
+      return [...new Set(
+        state.assets
+          .map(item => item.location)
+          .filter(Boolean)
+      )].sort((a, b) => a.localeCompare(b, 'zh-Hant'));
     }
 
     function renderLocations() {
-      const locations = getUniqueLocations();
-
       el.locationSelect.innerHTML = '<option value="">請選擇地點</option>';
-      locations.forEach(location => {
+
+      getUniqueLocations().forEach(location => {
         const option = document.createElement('option');
         option.value = location;
         option.textContent = location;
         el.locationSelect.appendChild(option);
       });
-
-      resetRoomSelect();
-      clearPreviousKwh();
     }
 
-    function resetRoomSelect() {
-      el.roomSelect.innerHTML = '<option value="">請先選擇地點</option>';
-      el.roomSelect.disabled = true;
+    function resetBillGroups() {
+      el.billGroupSelect.innerHTML = '<option value="">請先選擇地點</option>';
+      el.billGroupSelect.disabled = true;
     }
 
-    function clearPreviousKwh() {
-      el.previousKwh.value = '';
-    }
+    function renderBillGroups(location) {
+      const groups = [...new Set(
+        state.assets
+          .filter(item => item.location === location)
+          .map(item => item.billGroup)
+          .filter(Boolean)
+      )].sort((a, b) => a.localeCompare(b, 'zh-Hant'));
 
-    function renderRooms(location) {
-      const rooms = getNormalizedAssets()
-        .filter(item => item.location === location)
-        .map(item => item.room);
-
-      el.roomSelect.innerHTML = '<option value="">請選擇房號</option>';
-      rooms.forEach(room => {
+      el.billGroupSelect.innerHTML = '<option value="">請選擇帳單群組</option>';
+      groups.forEach(group => {
         const option = document.createElement('option');
-        option.value = room;
-        option.textContent = room;
-        el.roomSelect.appendChild(option);
+        option.value = group;
+        option.textContent = group;
+        el.billGroupSelect.appendChild(option);
       });
 
-      el.roomSelect.disabled = false;
-      clearPreviousKwh();
+      el.billGroupSelect.disabled = false;
     }
 
-    function findAsset(location, room) {
-      return getNormalizedAssets().find(item => item.location === location && item.room === room) || null;
-    }
-
-    function findLatestReading(location, room) {
+    function getLatestReading(location, room, billGroup) {
       return state.latestReadings.find(item =>
-        String(item.location || '').trim() === location &&
-        String(item.room || '').trim() === room
+        item.location === location &&
+        item.room === room &&
+        item.billGroup === billGroup
       ) || null;
     }
 
-    function updatePreviousKwh() {
-      const location = el.locationSelect.value;
-      const room = el.roomSelect.value;
+    function clearGroupTable() {
+      state.selectedGroupRooms = [];
+      state.calculationResult = null;
+      el.groupTableBody.innerHTML = '';
+      el.groupTableWrap.classList.add('hidden');
+      el.emptyGroupText.classList.remove('hidden');
+      el.roomCountText.textContent = '0';
+      el.summaryCard.classList.add('hidden');
+    }
 
-      if (!location || !room) {
-        clearPreviousKwh();
+    function renderGroupRooms() {
+      const location = el.locationSelect.value;
+      const billGroup = el.billGroupSelect.value;
+
+      if (!location || !billGroup) {
+        clearGroupTable();
         return;
       }
 
-      const latest = findLatestReading(location, room);
-      const asset = findAsset(location, room);
+      const rooms = state.assets
+        .filter(item => item.location === location && item.billGroup === billGroup)
+        .sort((a, b) => String(a.room).localeCompare(String(b.room), 'zh-Hant', { numeric: true }))
+        .map(item => {
+          const latest = getLatestReading(item.location, item.room, item.billGroup);
+          const previousKwh = latest ? Number(latest.currentKwh || latest.lastKwh || 0) : Number(item.lastKwh || 0);
 
-      const previous = latest ? Number(latest.currentKwh || latest.lastKwh || 0) : Number(asset?.lastKwh || 0);
-      const publicFee = asset ? Number(asset.publicFee || 0) : 0;
+          return {
+            location: item.location,
+            room: item.room,
+            billGroup: item.billGroup,
+            previousKwh,
+            currentKwh: '',
+            usedKwh: 0,
+            publicFee: Number(item.publicFee || 0),
+            usageAmount: 0,
+            tenantAmount: 0
+          };
+        });
 
-      el.previousKwh.value = previous;
-      if (!el.publicFee.value) {
-        el.publicFee.value = publicFee;
+      state.selectedGroupRooms = rooms;
+      state.calculationResult = null;
+
+      el.groupTableBody.innerHTML = '';
+      el.roomCountText.textContent = String(rooms.length);
+
+      if (!rooms.length) {
+        clearGroupTable();
+        return;
       }
+
+      rooms.forEach((item, index) => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td class="px-4 py-3 border-b">${escapeHtml(item.room)}</td>
+          <td class="px-4 py-3 border-b">${item.previousKwh}</td>
+          <td class="px-4 py-3 border-b">
+            <input
+              type="number"
+              min="0"
+              step="1"
+              class="group-current-kwh w-32 rounded-lg border border-slate-300 px-3 py-2"
+              data-index="${index}"
+              placeholder="輸入本期度數"
+            />
+          </td>
+          <td class="px-4 py-3 border-b used-kwh-cell">0</td>
+          <td class="px-4 py-3 border-b">${item.publicFee}</td>
+          <td class="px-4 py-3 border-b usage-amount-cell">0</td>
+          <td class="px-4 py-3 border-b tenant-amount-cell">0</td>
+        `;
+        el.groupTableBody.appendChild(row);
+      });
+
+      bindCurrentInputs();
+      el.groupTableWrap.classList.remove('hidden');
+      el.emptyGroupText.classList.add('hidden');
+      el.summaryCard.classList.add('hidden');
     }
 
-    function calculate() {
+    function bindCurrentInputs() {
+      document.querySelectorAll('.group-current-kwh').forEach(input => {
+        input.addEventListener('input', () => {
+          const index = Number(input.dataset.index);
+          const current = Number(input.value || 0);
+          const item = state.selectedGroupRooms[index];
+          if (!item) return;
+
+          item.currentKwh = input.value === '' ? '' : current;
+          item.usedKwh = input.value === '' ? 0 : Math.max(0, current - item.previousKwh);
+
+          const row = input.closest('tr');
+          if (row) {
+            row.querySelector('.used-kwh-cell').textContent = String(item.usedKwh);
+          }
+        });
+      });
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+    }
+
+    function calculateGroup() {
       const location = el.locationSelect.value;
-      const room = el.roomSelect.value;
-      const previousKwh = Number(el.previousKwh.value);
-      const currentKwh = Number(el.currentKwh.value);
+      const billGroup = el.billGroupSelect.value;
       const billTotal = Number(el.billTotal.value);
-      const billKwh = Number(el.billKwh.value);
-      const publicFee = Number(el.publicFee.value || 0);
 
       if (!location) {
         showStatus('請先選擇地點。', 'error');
         return;
       }
-      if (!room) {
-        showStatus('請先選擇房號。', 'error');
+
+      if (!billGroup) {
+        showStatus('請先選擇帳單群組。', 'error');
         return;
       }
-      if (!Number.isFinite(previousKwh) || previousKwh < 0) {
-        showStatus('上期度數資料異常。', 'error');
+
+      if (!state.selectedGroupRooms.length) {
+        showStatus('目前沒有可計算的房間資料。', 'error');
         return;
       }
-      if (!Number.isFinite(currentKwh) || currentKwh < 0) {
-        showStatus('請輸入正確的本期度數。', 'error');
-        return;
-      }
-      if (currentKwh < previousKwh) {
-        showStatus('本期度數不可小於上期度數。', 'error');
-        return;
-      }
+
       if (!Number.isFinite(billTotal) || billTotal < 0) {
         showStatus('請輸入正確的台電總金額。', 'error');
         return;
       }
-      if (!Number.isFinite(billKwh) || billKwh <= 0) {
-        showStatus('請輸入正確的台電總度數。', 'error');
-        return;
+
+      for (const item of state.selectedGroupRooms) {
+        if (item.currentKwh === '') {
+          showStatus(`請輸入房號 ${item.room} 的本期度數。`, 'error');
+          return;
+        }
+        if (Number(item.currentKwh) < Number(item.previousKwh)) {
+          showStatus(`房號 ${item.room} 的本期度數不可小於上期度數。`, 'error');
+          return;
+        }
       }
-      if (!Number.isFinite(publicFee) || publicFee < 0) {
-        showStatus('公電費不可為負數。', 'error');
+
+      const groupTotalUsed = state.selectedGroupRooms.reduce((sum, item) => sum + Number(item.usedKwh || 0), 0);
+
+      if (groupTotalUsed <= 0) {
+        showStatus('本組總用電必須大於 0。', 'error');
         return;
       }
 
-      const usedKwh = currentKwh - previousKwh;
+      let groupTenantTotal = 0;
 
-      const location = locationSelect.value;
-      const room = roomSelect.value;
-      
-      const billGroup = document.getElementById("billGroup").value;
-      
-      const current = Number(document.getElementById("current").value);
-      const previous = Number(document.getElementById("last").value);
-      const billTotal = Number(document.getElementById("billTotal").value);
-      const publicFee = Number(document.getElementById("fee").value);
-      
-      const used = current - previous;
-      
-      // 取得同群組所有房間
-      const groupRooms = assets.filter(a =>
-        a.location === location &&
-        a.billGroup === billGroup
-      );
-      
-      // 取得最新度數（如果有）
-      const readings = await fetch(`${GAS_URL}?action=getLatestReadings`)
-        .then(r => r.json());
-      
-      // 計算群組總用電
-      let totalUsed = 0;
-      
-      groupRooms.forEach(r => {
-        const latest = readings.data.find(x =>
-          x.location === r.location &&
-          x.room === r.room &&
-          x.billGroup === r.billGroup
-        );
-      
-        const prev = Number(r.lastKwh);
-        const curr = r.room === room ? current : Number(latest?.currentKwh || prev);
-      
-        totalUsed += (curr - prev);
+      state.selectedGroupRooms.forEach(item => {
+        item.usageAmount = billTotal * (item.usedKwh / groupTotalUsed);
+        item.tenantAmount = Math.round(item.usageAmount + item.publicFee);
+        groupTenantTotal += item.tenantAmount;
       });
-      
-      // 分攤
-      const share = billTotal * (used / totalUsed);
-      const finalAmount = Math.round(share + publicFee);
-      
-      const usageAmount = usedKwh * unitPrice;
-      const tenantAmount = usageAmount + publicFee;
 
-      state.currentResult = {
+      updateResultTable();
+
+      state.calculationResult = {
         location,
-        room,
-        previousKwh,
-        currentKwh,
-        usedKwh,
+        billGroup,
         billTotal,
-        billKwh,
-        unitPrice,
-        publicFee,
-        usageAmount,
-        tenantAmount,
-        remark: el.remark.value.trim()
+        groupTotalUsed,
+        remark: el.remark.value.trim(),
+        items: state.selectedGroupRooms.map(item => ({ ...item }))
       };
 
-      el.usedKwhText.textContent = `${usedKwh.toFixed(0)} 度`;
-      el.unitPriceText.textContent = `${unitPrice.toFixed(4)} 元`;
-      el.usageAmountText.textContent = `${Math.round(usageAmount)} 元`;
-      el.tenantAmountText.textContent = `${Math.round(tenantAmount)} 元`;
-      el.formulaDetail.textContent =
-        `(${billTotal} ÷ ${billKwh}) × ${usedKwh} + ${publicFee} = ${tenantAmount.toFixed(2)} 元`;
+      el.groupTotalUsedText.textContent = `${groupTotalUsed} 度`;
+      el.billTotalText.textContent = `${Math.round(billTotal)} 元`;
+      el.groupTenantTotalText.textContent = `${Math.round(groupTenantTotal)} 元`;
+      el.summaryCard.classList.remove('hidden');
 
-      el.resultCard.classList.remove('hidden');
-      showStatus('計算完成。', 'success');
+      showStatus('整組分攤計算完成。', 'success');
     }
 
-    async function syncMeterRecord() {
-      if (!state.currentResult) {
-        showStatus('請先完成計算，再進行同步。', 'error');
+    function updateResultTable() {
+      const rows = el.groupTableBody.querySelectorAll('tr');
+      rows.forEach((row, index) => {
+        const item = state.selectedGroupRooms[index];
+        if (!item) return;
+
+        row.querySelector('.used-kwh-cell').textContent = String(item.usedKwh);
+        row.querySelector('.usage-amount-cell').textContent = String(Math.round(item.usageAmount));
+        row.querySelector('.tenant-amount-cell').textContent = String(Math.round(item.tenantAmount));
+      });
+    }
+
+    async function syncGroupRecords() {
+      if (!state.calculationResult || !state.calculationResult.items || !state.calculationResult.items.length) {
+        showStatus('請先完成整組分攤計算。', 'error');
         return;
       }
-
-      if (!GAS_URL || GAS_URL === '你的 GAS Web App URL') {
-        showStatus('尚未設定 GAS_URL，無法同步到雲端。', 'error');
-        return;
-      }
-
-      const payload = {
-        action: 'saveMeterRecord',
-        ...state.currentResult,
-        createdAt: new Date().toISOString()
-      };
 
       try {
         el.syncBtn.disabled = true;
         el.syncBtn.textContent = '同步中...';
 
-        const response = await fetch(GAS_URL, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'text/plain;charset=utf-8'
-          },
-          body: JSON.stringify(payload)
-        });
+        for (const item of state.calculationResult.items) {
+          const payload = {
+            action: 'saveMeterRecord',
+            location: item.location,
+            room: item.room,
+            billGroup: item.billGroup,
+            previousKwh: item.previousKwh,
+            currentKwh: item.currentKwh,
+            usedKwh: item.usedKwh,
+            billTotal: state.calculationResult.billTotal,
+            publicFee: item.publicFee,
+            usageAmount: Math.round(item.usageAmount),
+            tenantAmount: Math.round(item.tenantAmount),
+            remark: state.calculationResult.remark,
+            createdAt: new Date().toISOString()
+          };
 
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
+          const response = await fetch(GAS_URL, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'text/plain;charset=utf-8'
+            },
+            body: JSON.stringify(payload)
+          });
+
+          const result = await response.json();
+          if (result.success === false) {
+            throw new Error(result.message || `同步房號 ${item.room} 失敗`);
+          }
         }
 
-        let result = {};
-        try {
-          result = await response.json();
-        } catch {
-          result = { success: true };
-        }
-
-        if (result.success === false) {
-          throw new Error(result.message || '同步失敗');
-        }
-
-        const existingIndex = state.latestReadings.findIndex(item =>
-          String(item.location || '').trim() === state.currentResult.location &&
-          String(item.room || '').trim() === state.currentResult.room
-        );
-
-        const latestItem = {
-          location: state.currentResult.location,
-          room: state.currentResult.room,
-          currentKwh: state.currentResult.currentKwh,
-          lastKwh: state.currentResult.currentKwh,
-          updatedAt: new Date().toISOString()
-        };
-
-        if (existingIndex >= 0) {
-          state.latestReadings[existingIndex] = latestItem;
-        } else {
-          state.latestReadings.push(latestItem);
-        }
-
-        saveLocalData();
-        el.previousKwh.value = state.currentResult.currentKwh;
-        el.currentKwh.value = '';
-
-        showStatus('抄表紀錄已成功同步。', 'success');
+        showStatus('整組抄表紀錄已成功同步。', 'success');
+        await loadCloudData();
+        el.billGroupSelect.value = state.calculationResult.billGroup;
+        renderGroupRooms();
       } catch (error) {
         showStatus(`同步失敗：${error.message}`, 'error');
       } finally {
         el.syncBtn.disabled = false;
-        el.syncBtn.textContent = '同步抄表紀錄';
+        el.syncBtn.textContent = '同步整組抄表紀錄';
       }
     }
 
@@ -506,28 +506,17 @@
       el.locationSelect.addEventListener('change', () => {
         const location = el.locationSelect.value;
         if (!location) {
-          resetRoomSelect();
-          clearPreviousKwh();
+          resetBillGroups();
+          clearGroupTable();
           return;
         }
-        renderRooms(location);
+        renderBillGroups(location);
+        clearGroupTable();
       });
 
-      roomSelect.addEventListener('change', () => {
-        const selected = assets.find(a =>
-          a.location === locationSelect.value &&
-          a.room === roomSelect.value
-        );
-      
-        if (!selected) return;
-      
-        document.getElementById("last").value = selected.lastKwh ?? "";
-        document.getElementById("fee").value = selected.publicFee ?? "";
-        document.getElementById("billGroup").value = selected.billGroup ?? "";
-      });
-      
-      el.calculateBtn.addEventListener('click', calculate);
-      el.syncBtn.addEventListener('click', syncMeterRecord);
+      el.billGroupSelect.addEventListener('change', renderGroupRooms);
+      el.calculateBtn.addEventListener('click', calculateGroup);
+      el.syncBtn.addEventListener('click', syncGroupRecords);
       el.reloadBtn.addEventListener('click', loadCloudData);
     }
 
