@@ -107,6 +107,7 @@
     };
 
     let data = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    let latestReadings = [];
     let editIndex = -1;
 
     function showStatus(message, type = 'info') {
@@ -150,9 +151,24 @@
         location: String(item.location || '').trim(),
         room: String(item.room || '').trim(),
         billGroup: String(item.billGroup || '').trim(),
+        currentKwh: Number(item.currentKwh || item.lastKwh || 0),
         lastKwh: Number(item.lastKwh || 0),
         publicFee: Number(item.publicFee || 0)
       };
+    }
+
+    function getEffectiveLastKwh(item) {
+      const latest = latestReadings.find(r =>
+        r.location === item.location &&
+        r.room === item.room &&
+        r.billGroup === item.billGroup
+      );
+    
+      if (latest) {
+        return Number(latest.currentKwh || latest.lastKwh || 0);
+      }
+    
+      return Number(item.lastKwh || 0);
     }
 
     function getUniqueLocations() {
@@ -250,7 +266,7 @@
                   <div>
                     <div class="text-lg font-bold text-slate-900">${escapeHtml(item.room)}</div>
                     <div class="text-sm text-slate-600 mt-1">帳單群組：${escapeHtml(item.billGroup || '-')}</div>
-                    <div class="text-sm text-slate-600">上期度數：${Number(item.lastKwh)} 度</div>
+                    <div class="text-sm text-slate-600">上期度數：${getEffectiveLastKwh(item)} 度</div>
                     <div class="text-sm text-slate-600">公電費：${Number(item.publicFee)} 元</div>
                   </div>
                   <div class="flex gap-2">
@@ -352,7 +368,7 @@
       el.loc.value = item.location ?? '';
       el.room.value = item.room ?? '';
       el.billGroup.value = item.billGroup ?? '';
-      el.last.value = item.lastKwh ?? '';
+      el.last.value = getEffectiveLastKwh(item);
       el.fee.value = item.publicFee ?? '';
       editIndex = index;
       el.saveBtn.textContent = '儲存修正';
@@ -376,15 +392,22 @@
       showStatus('資料已刪除。', 'success');
     }
 
-    async function loadFromCloud() {
+  async function loadFromCloud() {
       try {
         el.reloadBtn.disabled = true;
         el.reloadBtn.textContent = '載入中...';
-
-        const response = await fetch(`${GAS_URL}?action=getAssets`);
-        const result = await response.json();
-
-        data = Array.isArray(result.data) ? result.data.map(normalizeItem) : [];
+    
+        const [assetsResponse, latestResponse] = await Promise.all([
+          fetch(`${GAS_URL}?action=getAssets`),
+          fetch(`${GAS_URL}?action=getLatestReadings`)
+        ]);
+    
+        const assetsResult = await assetsResponse.json();
+        const latestResult = await latestResponse.json();
+    
+        data = Array.isArray(assetsResult.data) ? assetsResult.data.map(normalizeItem) : [];
+        latestReadings = Array.isArray(latestResult.data) ? latestResult.data.map(normalizeLatest) : [];
+    
         saveLocal();
         clearForm();
         renderLocationFilter();
@@ -396,7 +419,7 @@
         el.reloadBtn.disabled = false;
         el.reloadBtn.textContent = '從雲端載入';
       }
-    }
+  }
 
     async function syncToCloud() {
       try {
