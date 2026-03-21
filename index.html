@@ -87,10 +87,36 @@
         const GS_URL = "https://script.google.com/macros/s/AKfycbzW-Cv2scTGNwTv68xGhIpvYy5m0Hfn-bwWsLeRKdIRLnPuaooK8jRS4uiy6WTQnW4aXg/exec";
         let assets = JSON.parse(localStorage.getItem('tp_v6_assets') || '[]');
         let latestReadings = [];
-        async function initData() {
-            try {
-                const [resA, resL] = await Promise.all([
-                    fetch(`${GS_URL}?action=getAssets`).then(r => r.json()),
+async function initData() {
+    try {
+        const [resA, resL] = await Promise.all([
+            fetch(`${GS_URL}?action=getAssets`).then(r => r.json()),
+            fetch(`${GS_URL}?action=getLatestReadings`).then(r => r.json())
+        ]);
+        assets = Array.isArray(resA) ? resA : [];
+        latestReadings = Array.isArray(resL) ? resL : [];
+        localStorage.setItem("tp_v6_assets", JSON.stringify(assets));
+        renderLocations();
+    } catch (e) { console.error("Sync Failed", e); }
+}
+
+async function submitRecord() {
+    const btn = document.getElementById("btnSubmit");
+    btn.disabled = true; btn.innerText = "同步中...";
+    const data = {
+        locId: document.getElementById("selLoc").value,
+        roomId: document.getElementById("selRoom").value,
+        prev: document.getElementById("valPrev").value,
+        curr: document.getElementById("valCurr").value,
+        total: document.getElementById("resTotal").innerText.replace(/,/g, "")
+    };
+    try {
+        await fetch(GS_URL, { method: "POST", body: JSON.stringify(data) });
+        alert("數據已上傳雲端！");
+        location.reload();
+    } catch (e) { alert("同步失敗，請檢查網路"); }
+    btn.disabled = false; btn.innerText = "儲存並同步至雲端";
+}
                     fetch(`${GS_URL}?action=getLatestReadings`).then(r => r.json())
                 ]);
                 assets = Array.isArray(resA) ? resA : []; 
@@ -134,22 +160,23 @@
             document.getElementById('readingSource').innerText = cloud ? 'CLOUD' : 'ASSET';
             calc();
         }
-        function calc() {
-            const prev = parseFloat(document.getElementById('valPrev').value || 0);
-            const curr = parseFloat(document.getElementById('valCurr').value || 0);
-            const billT = parseFloat(document.getElementById('billT').value || 0);
-            const billK = parseFloat(document.getElementById('billK').value || 1);
-            if(curr > prev) {
-                const used = curr - prev;
-                const price = billT / billK;
-                const rid = document.getElementById('selRoom').value;
-                const r = assets.find(a => a.roomId == rid);
-                const total = Math.round(used * price + (r ? r.publicFee : 0));
-                document.getElementById('resUsed').innerText = used.toFixed(1);
-                document.getElementById('resPrice').innerText = price.toFixed(2);
-                document.getElementById('resTotal').innerText = total.toLocaleString();
-                document.getElementById('resBox').classList.remove('hidden');
-            } else { document.getElementById('resBox').classList.add('hidden'); }
+function calc() {
+    const billT = parseFloat(document.getElementById("billT").value || 0);
+    const billK = parseFloat(document.getElementById("billK").value || 0);
+    const valPrev = parseFloat(document.getElementById("valPrev").value || 0);
+    const valCurr = parseFloat(document.getElementById("valCurr").value || 0);
+    const used = valCurr - valPrev;
+    if (used > 0 && billK > 0) {
+        const price = billT / billK;
+        const total = Math.round(used * price);
+        document.getElementById("resUsed").innerText = used.toFixed(1);
+        document.getElementById("resPrice").innerText = price.toFixed(2);
+        document.getElementById("resTotal").innerText = total.toLocaleString();
+        document.getElementById("resBox").classList.remove("hidden");
+    } else {
+        document.getElementById("resBox").classList.add("hidden");
+    }
+}
         }
         async function submitRecord() {
             const rid = document.getElementById('selRoom').value;
