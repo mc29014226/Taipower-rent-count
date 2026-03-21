@@ -1,44 +1,191 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>台電租賃計費器 v6.0-Stable</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>電費分攤系統</title>
+<script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-slate-50 p-4">
-    <div id="app" class="max-w-md mx-auto bg-white rounded-xl shadow-md p-6">
-        <h1 class="text-2xl font-bold text-slate-800 mb-4">⚡ 台電計費器 v6.0</h1>
-        <select id="locationSelect" class="w-full p-2 mb-4 border rounded"></select>
-        <div id="roomList" class="space-y-4"></div>
-        <button onclick="calculateAll()" class="w-full mt-6 bg-blue-600 text-white p-3 rounded-lg">計算並同步</button>
-    </div>
-    <script>
-        const CONFIG = { GAS_URL: 'https://script.google.com/macros/s/AKfycbzW-Cv2scTGNwTv68xGhIpvYy5m0Hfn-bwWsLeRKdIRLnPuaooK8jRS4uiy6WTQnW4aXg/exec' };
-        let assets = JSON.parse(localStorage.getItem('tp_assets')) || [];
-        function init() {
-            const sel = document.getElementById('locationSelect');
-            if(!sel) return;
-            sel.innerHTML = assets.map(loc => `<option value="${loc.name}">${loc.name}</option>`).join('');
-            renderRooms();
+
+<body class="bg-slate-100 p-4">
+
+<div class="max-w-xl mx-auto space-y-4">
+
+<h1 class="text-xl font-bold">電費分攤</h1>
+
+<!-- 地點 -->
+<select id="selLoc" class="w-full p-3 rounded-xl border"></select>
+
+<!-- 房間 -->
+<select id="selRoom" class="w-full p-3 rounded-xl border"></select>
+
+<!-- 上期 -->
+<input id="valPrev" class="w-full p-3 rounded-xl border" placeholder="上期度數" readonly>
+
+<!-- 本期 -->
+<input id="valCurr" type="number" class="w-full p-3 rounded-xl border" placeholder="本期度數">
+
+<!-- 台電 -->
+<input id="billT" type="number" class="w-full p-3 rounded-xl border" placeholder="台電總金額">
+<input id="billK" type="number" class="w-full p-3 rounded-xl border" placeholder="台電總度數">
+
+<!-- 計算 -->
+<button onclick="calc()" class="w-full bg-blue-500 text-white p-3 rounded-xl">
+計算
+</button>
+
+<!-- 結果 -->
+<div id="resBox" class="hidden bg-white p-4 rounded-xl border">
+<div>用電：<span id="resUsed"></span></div>
+<div>單價：<span id="resPrice"></span></div>
+<div class="font-bold text-lg">金額：$<span id="resTotal"></span></div>
+</div>
+
+<!-- 同步 -->
+<button onclick="submitRecord()" class="w-full bg-green-500 text-white p-3 rounded-xl">
+同步到雲端
+</button>
+
+</div>
+
+<script>
+const GS_URL = "https://script.google.com/macros/s/AKfycbzW-Cv2scTGNwTv68xGhIpvYy5m0Hfn-bwWsLeRKdIRLnPuaooK8jRS4uiy6WTQnW4aXg/exec";
+
+let assets = [];
+let latest = [];
+
+// ===== 初始化 =====
+async function init() {
+    try {
+        const [a, l] = await Promise.all([
+            fetch(GS_URL + "?action=getAssets").then(r=>r.json()),
+            fetch(GS_URL + "?action=getLatestReadings").then(r=>r.json())
+        ]);
+
+        assets = Array.isArray(a) ? a : [];
+        latest = Array.isArray(l) ? l : [];
+
+        localStorage.setItem("backup_assets", JSON.stringify(assets));
+
+    } catch {
+        assets = JSON.parse(localStorage.getItem("backup_assets") || "[]");
+    }
+
+    renderLocations();
+}
+
+// ===== 地點 =====
+function renderLocations() {
+    const sel = document.getElementById("selLoc");
+
+    const map = {};
+    assets.forEach(a=>{
+        map[a.locationId] = a.locationName;
+    });
+
+    sel.innerHTML = Object.entries(map)
+        .map(([id,name])=>`<option value="${id}">${name}</option>`)
+        .join("");
+
+    renderRooms();
+}
+
+// ===== 房間 =====
+function renderRooms() {
+    const loc = document.getElementById("selLoc").value;
+    const sel = document.getElementById("selRoom");
+
+    const rooms = assets.filter(a=>a.locationId===loc);
+
+    sel.innerHTML = rooms
+        .map(r=>`<option value="${r.roomId}">${r.roomName}</option>`)
+        .join("");
+
+    loadPrev();
+}
+
+// ===== 上期度數 =====
+function loadPrev() {
+    const loc = selLoc.value;
+    const room = selRoom.value;
+
+    const cloud = latest.find(r=>r.locationId==loc && r.roomId==room);
+    const asset = assets.find(r=>r.locationId==loc && r.roomId==room);
+
+    document.getElementById("valPrev").value =
+        cloud ? cloud.latestKwh : (asset?.lastKwh || 0);
+}
+
+// ===== 計算 =====
+function calc() {
+    const loc = selLoc.value;
+    const room = selRoom.value;
+
+    const asset = assets.find(r=>r.locationId==loc && r.roomId==room);
+
+    const prev = Number(valPrev.value);
+    const curr = Number(valCurr.value);
+    const billT = Number(billT_input());
+    const billK = Number(billK_input());
+
+    const used = curr - prev;
+
+    if(used<0 || billK<=0) return;
+
+    const unit = billT / billK;
+    const total = Math.round(used * unit + (asset?.publicFee || 0));
+
+    resUsed.innerText = used;
+    resPrice.innerText = unit.toFixed(3);
+    resTotal.innerText = total;
+
+    resBox.classList.remove("hidden");
+}
+
+function billT_input(){return document.getElementById("billT").value}
+function billK_input(){return document.getElementById("billK").value}
+
+// ===== 同步 =====
+async function submitRecord() {
+
+    const loc = selLoc.value;
+    const room = selRoom.value;
+    const asset = assets.find(r=>r.locationId==loc && r.roomId==room);
+
+    const payload = {
+        action:"saveMeterRecord",
+        payload:{
+            timestamp:new Date().toISOString(),
+            locationId:asset.locationId,
+            locationName:asset.locationName,
+            roomId:asset.roomId,
+            roomName:asset.roomName,
+            previousKwh:Number(valPrev.value),
+            currentKwh:Number(valCurr.value),
+            usedKwh:Number(resUsed.innerText),
+            billTotal:Number(billT_input()),
+            billKwh:Number(billK_input()),
+            unitPrice:Number(resPrice.innerText),
+            publicFee:Number(asset.publicFee||0),
+            tenantAmount:Number(resTotal.innerText)
         }
-        function renderRooms() {
-            const locName = document.getElementById('locationSelect').value;
-            const loc = assets.find(a => a.name === locName);
-            if(!loc) return;
-            document.getElementById('roomList').innerHTML = loc.rooms.map(r => `
-                <div class="p-3 border rounded bg-slate-50">
-                    <div class="font-bold text-slate-700">${r.id} 房</div>
-                    <input type="number" placeholder="本次度數" class="w-full p-1 mt-1 border rounded" id="val-${r.id}">
-                    <div class="text-xs text-slate-500 mt-1">前次度數: ${r.lastKwh || 0}</div>
-                </div>`).join('');
-        }
-        async function calculateAll() {
-            console.log('執行比例分攤算法與 GAS 同步...');
-            alert('核心邏輯已注入，準備進行計算測試');
-        }
-        document.getElementById('locationSelect').onchange = renderRooms;
-        window.onload = init;
-    </script>
+    };
+
+    await fetch(GS_URL,{
+        method:"POST",
+        body:JSON.stringify(payload)
+    });
+
+    alert("已同步");
+    init();
+}
+
+// ===== 事件 =====
+selLoc.onchange = renderRooms;
+selRoom.onchange = loadPrev;
+
+init();
+</script>
+
 </body>
 </html>
