@@ -157,6 +157,17 @@
       };
     }
 
+    function normalizeLatest(item) {
+      return {
+        location: String(item.location || '').trim(),
+        room: String(item.room || '').trim(),
+        billGroup: String(item.billGroup || '').trim(),
+        currentKwh: Number(item.currentKwh || item.lastKwh || 0),
+        lastKwh: Number(item.lastKwh || 0),
+        updatedAt: String(item.updatedAt || '').trim()
+      };
+    }
+
     function getEffectiveLastKwh(item) {
       const latest = latestReadings.find(r =>
         r.location === item.location &&
