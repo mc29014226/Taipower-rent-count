@@ -354,7 +354,49 @@
       }
 
       const usedKwh = currentKwh - previousKwh;
-      const unitPrice = billTotal / billKwh;
+
+      const location = locationSelect.value;
+      const room = roomSelect.value;
+      
+      const billGroup = document.getElementById("billGroup").value;
+      
+      const current = Number(document.getElementById("current").value);
+      const previous = Number(document.getElementById("last").value);
+      const billTotal = Number(document.getElementById("billTotal").value);
+      const publicFee = Number(document.getElementById("fee").value);
+      
+      const used = current - previous;
+      
+      // 取得同群組所有房間
+      const groupRooms = assets.filter(a =>
+        a.location === location &&
+        a.billGroup === billGroup
+      );
+      
+      // 取得最新度數（如果有）
+      const readings = await fetch(`${GAS_URL}?action=getLatestReadings`)
+        .then(r => r.json());
+      
+      // 計算群組總用電
+      let totalUsed = 0;
+      
+      groupRooms.forEach(r => {
+        const latest = readings.data.find(x =>
+          x.location === r.location &&
+          x.room === r.room &&
+          x.billGroup === r.billGroup
+        );
+      
+        const prev = Number(r.lastKwh);
+        const curr = r.room === room ? current : Number(latest?.currentKwh || prev);
+      
+        totalUsed += (curr - prev);
+      });
+      
+      // 分攤
+      const share = billTotal * (used / totalUsed);
+      const finalAmount = Math.round(share + publicFee);
+      
       const usageAmount = usedKwh * unitPrice;
       const tenantAmount = usageAmount + publicFee;
 
@@ -471,7 +513,19 @@
         renderRooms(location);
       });
 
-      el.roomSelect.addEventListener('change', updatePreviousKwh);
+      roomSelect.addEventListener('change', () => {
+        const selected = assets.find(a =>
+          a.location === locationSelect.value &&
+          a.room === roomSelect.value
+        );
+      
+        if (!selected) return;
+      
+        document.getElementById("last").value = selected.lastKwh ?? "";
+        document.getElementById("fee").value = selected.publicFee ?? "";
+        document.getElementById("billGroup").value = selected.billGroup ?? "";
+      });
+      
       el.calculateBtn.addEventListener('click', calculate);
       el.syncBtn.addEventListener('click', syncMeterRecord);
       el.reloadBtn.addEventListener('click', loadCloudData);
