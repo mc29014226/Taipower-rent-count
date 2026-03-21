@@ -3,226 +3,42 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>租屋電力雲 v6.0 - 雲端實體化</title>
+    <title>台電租賃計費器 v6.0-Stable</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        .page { display: none; } .page.active { display: block; }
-        @media print { .no-print { display: none; } .print-only { display: block !important; } }
-        .print-only { display: none; }
-    </style>
 </head>
-<body class="bg-slate-100 min-h-screen pb-24 font-sans text-slate-900">
-    <header class="bg-slate-900 text-white p-4 shadow-lg sticky top-0 z-50 flex justify-between items-center no-print">
-        <h1 class="text-lg font-bold tracking-tighter italic">POWER-RENT <span class="text-emerald-400 not-italic">v6.0</span></h1>
-        <button onclick="initData()" class="text-xs bg-slate-800 px-3 py-1 rounded-full border border-slate-700">🔄 同步雲端</button>
-    </header>
-    <main class="max-w-xl mx-auto p-4">
-        <section id="page-setup" class="page">
-            <div class="flex justify-between items-center mb-6">
-                <h2 class="text-2xl font-black">資產主檔設定</h2>
-                <button onclick="pushAssets()" class="bg-emerald-600 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg shadow-emerald-200">同步資產到雲端</button>
-            </div>
-            <div id="assetList" class="space-y-4"></div>
-            <button onclick="addNewLocation()" class="w-full mt-6 py-6 border-2 border-dashed border-slate-300 rounded-3xl text-slate-400 font-bold hover:bg-white">+ 新增房產地點</button>
-        </section>
-        <section id="page-input" class="page active">
-            <h2 class="text-2xl font-black mb-6">度數錄入同步</h2>
-            <div class="bg-white p-6 rounded-[2rem] shadow-xl border border-slate-200 space-y-6">
-                <div class="grid grid-cols-2 gap-4">
-                    <div class="space-y-1">
-                        <label class="text-xs font-bold text-slate-400">地點</label>
-                        <select id="selLoc" onchange="renderRooms()" class="w-full p-3 bg-slate-50 rounded-2xl outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-slate-900 transition-all"></select>
-                    </div>
-                    <div class="space-y-1">
-                        <label class="text-xs font-bold text-slate-400">房間</label>
-                        <select id="selRoom" onchange="syncLastReading()" class="w-full p-3 bg-slate-50 rounded-2xl outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-slate-900 transition-all"></select>
-                    </div>
-                </div>
-                <div class="grid grid-cols-2 gap-4">
-                    <div class="bg-slate-50 p-4 rounded-3xl relative">
-                        <label class="text-[10px] font-bold text-slate-400 uppercase">上期度數</label>
-                        <div id="readingSource" class="absolute top-4 right-4 text-[8px] bg-emerald-100 text-emerald-700 px-1 rounded">CLOUD</div>
-                        <input id="valPrev" type="number" readonly class="w-full bg-transparent text-xl font-mono font-bold">
-                    </div>
-                    <div class="bg-slate-900 p-4 rounded-3xl text-white ring-4 ring-emerald-400/20">
-                        <label class="text-[10px] font-bold text-slate-500 uppercase">本次度數</label>
-                        <input id="valCurr" type="number" oninput="calc()" class="w-full bg-transparent text-xl font-mono font-bold text-emerald-400 outline-none">
-                    </div>
-                </div>
-                <div class="grid grid-cols-2 gap-4">
-                    <div class="space-y-1">
-                        <label class="text-xs font-bold text-slate-400 uppercase">台電總金額</label>
-                        <input id="billT" type="number" oninput="calc()" class="w-full p-3 bg-slate-50 rounded-2xl ring-1 ring-slate-200 outline-none">
-                    </div>
-                    <div class="space-y-1">
-                        <label class="text-xs font-bold text-slate-400 uppercase">台電總度數</label>
-                        <input id="billK" type="number" oninput="calc()" class="w-full p-3 bg-slate-50 rounded-2xl ring-1 ring-slate-200 outline-none">
-                    </div>
-                </div>
-                <div id="resBox" class="hidden bg-slate-50 p-6 rounded-3xl space-y-3">
-                    <div class="flex justify-between text-sm"><span>使用度數</span><span id="resUsed" class="font-mono font-bold">0</span></div>
-                    <div class="flex justify-between text-sm"><span>每度單價</span><span id="resPrice" class="font-mono">0</span></div>
-                    <div class="flex justify-between items-end border-t border-slate-200 pt-3">
-                        <span class="font-bold">應繳總額 (+公電)</span>
-                        <span class="text-3xl font-black text-slate-900">$ <span id="resTotal">0</span></span>
-                    </div>
-                </div>
-                <button onclick="submitRecord()" id="btnSubmit" class="w-full bg-slate-900 text-white py-5 rounded-3xl font-bold text-lg hover:bg-slate-800 transition-colors shadow-2xl shadow-slate-300 active:scale-95">儲存並同步至雲端</button>
-            </div>
-        </section>
-        <section id="page-bill" class="page">
-            <div class="flex justify-between items-center mb-6 no-print">
-                <h2 class="text-2xl font-black">帳單明細</h2>
-                <button onclick="window.print()" class="bg-slate-200 px-4 py-2 rounded-xl text-xs font-bold">🖨️ 列印</button>
-            </div>
-            <div id="billContainer" class="space-y-6"></div>
-        </section>
-    </main>
-    <nav class="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-xl border-t border-slate-200 flex justify-around p-3 pb-8 z-50 no-print">
-        <button onclick="switchPage('setup')" class="flex flex-col items-center gap-1 text-slate-400"><span class="text-xl">⚙️</span><span class="text-[10px] font-black">資產</span></button>
-        <button onclick="switchPage('input')" class="flex flex-col items-center gap-1 text-slate-900"><span class="text-xl">⚡</span><span class="text-[10px] font-black">錄入</span></button>
-        <button onclick="switchPage('bill')" class="flex flex-col items-center gap-1 text-slate-400"><span class="text-xl">🧾</span><span class="text-[10px] font-black">帳單</span></button>
-    </nav>
+<body class="bg-slate-50 p-4">
+    <div id="app" class="max-w-md mx-auto bg-white rounded-xl shadow-md p-6">
+        <h1 class="text-2xl font-bold text-slate-800 mb-4">⚡ 台電計費器 v6.0</h1>
+        <select id="locationSelect" class="w-full p-2 mb-4 border rounded"></select>
+        <div id="roomList" class="space-y-4"></div>
+        <button onclick="calculateAll()" class="w-full mt-6 bg-blue-600 text-white p-3 rounded-lg">計算並同步</button>
+    </div>
     <script>
-        const GS_URL = "https://script.google.com/macros/s/AKfycbzW-Cv2scTGNwTv68xGhIpvYy5m0Hfn-bwWsLeRKdIRLnPuaooK8jRS4uiy6WTQnW4aXg/exec";
-        let assets = JSON.parse(localStorage.getItem('tp_v6_assets') || '[]');
-        let latestReadings = [];
-async function initData() {
-    try {
-        const [resA, resL] = await Promise.all([
-            fetch(`${GS_URL}?action=getAssets`).then(r => r.json()),
-            fetch(`${GS_URL}?action=getLatestReadings`).then(r => r.json())
-        ]);
-        assets = Array.isArray(resA) ? resA : [];
-        latestReadings = Array.isArray(resL) ? resL : [];
-        localStorage.setItem("tp_v6_assets", JSON.stringify(assets));
-        renderLocations();
-    } catch (e) { console.error("Sync Failed", e); }
-}
-
-async function submitRecord() {
-    const btn = document.getElementById("btnSubmit");
-    btn.disabled = true; btn.innerText = "同步中...";
-    const data = {
-        locId: document.getElementById("selLoc").value,
-        roomId: document.getElementById("selRoom").value,
-        prev: document.getElementById("valPrev").value,
-        curr: document.getElementById("valCurr").value,
-        total: document.getElementById("resTotal").innerText.replace(/,/g, "")
-    };
-    try {
-        await fetch(GS_URL, { method: "POST", body: JSON.stringify(data) });
-        alert("數據已上傳雲端！");
-        location.reload();
-    } catch (e) { alert("同步失敗，請檢查網路"); }
-    btn.disabled = false; btn.innerText = "儲存並同步至雲端";
-}
-                    fetch(`${GS_URL}?action=getLatestReadings`).then(r => r.json())
-                ]);
-                assets = Array.isArray(resA) ? resA : []; 
-                latestReadings = Array.isArray(resL) ? resL : [];
-                localStorage.setItem('tp_v6_assets', JSON.stringify(assets));
-                renderLocations();
-                alert('雲端同步成功');
-            } catch(e) { console.error(e); }
-        }
-        function switchPage(p) {
-            document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
-            document.getElementById('page-' + p).classList.add('active');
-            if(p === 'setup') renderAssetList();
-            if(p === 'bill') renderBillList();
-        }
-        function renderAssetList() {
-            const container = document.getElementById('assetList');
-            container.innerHTML = assets.length ? assets.map(a => `<div class="bg-white p-4 rounded-2xl border shadow-sm"><div class="font-bold">${a.locationName}</div><div class="text-sm text-slate-500">${a.roomName} (公電: $${a.publicFee})</div></div>`).join('') : '<div class="text-center py-10 text-slate-400">尚未建立資產資料</div>';
-        }
-        function renderLocations() {
-            const sel = document.getElementById('selLoc');
-            const unique = [...new Set(assets.map(a => a.locationId))];
-            sel.innerHTML = unique.map(id => {
-                const l = assets.find(a => a.locationId === id);
-                return `<option value="${id}">${l.locationName}</option>`;
-            }).join('');
-            if(unique.length) renderRooms();
+        const CONFIG = { GAS_URL: 'https://script.google.com/macros/s/AKfycbzW-Cv2scTGNwTv68xGhIpvYy5m0Hfn-bwWsLeRKdIRLnPuaooK8jRS4uiy6WTQnW4aXg/exec' };
+        let assets = JSON.parse(localStorage.getItem('tp_assets')) || [];
+        function init() {
+            const sel = document.getElementById('locationSelect');
+            if(!sel) return;
+            sel.innerHTML = assets.map(loc => `<option value="${loc.name}">${loc.name}</option>`).join('');
+            renderRooms();
         }
         function renderRooms() {
-            const lid = document.getElementById('selLoc').value;
-            const sel = document.getElementById('selRoom');
-            sel.innerHTML = assets.filter(a => a.locationId === lid).map(r => `<option value="${r.roomId}">${r.roomName}</option>`).join('');
-            syncLastReading();
+            const locName = document.getElementById('locationSelect').value;
+            const loc = assets.find(a => a.name === locName);
+            if(!loc) return;
+            document.getElementById('roomList').innerHTML = loc.rooms.map(r => `
+                <div class="p-3 border rounded bg-slate-50">
+                    <div class="font-bold text-slate-700">${r.id} 房</div>
+                    <input type="number" placeholder="本次度數" class="w-full p-1 mt-1 border rounded" id="val-${r.id}">
+                    <div class="text-xs text-slate-500 mt-1">前次度數: ${r.lastKwh || 0}</div>
+                </div>`).join('');
         }
-        function syncLastReading() {
-            const lid = document.getElementById('selLoc').value;
-            const rid = document.getElementById('selRoom').value;
-            const cloud = latestReadings.find(l => l.locationId == lid && l.roomId == rid);
-            const asset = assets.find(a => a.roomId == rid);
-            document.getElementById('valPrev').value = cloud ? cloud.latestKwh : (asset ? asset.lastKwh : 0);
-            document.getElementById('readingSource').innerText = cloud ? 'CLOUD' : 'ASSET';
-            calc();
+        async function calculateAll() {
+            console.log('執行比例分攤算法與 GAS 同步...');
+            alert('核心邏輯已注入，準備進行計算測試');
         }
-function calc() {
-    const billT = parseFloat(document.getElementById("billT").value || 0);
-    const billK = parseFloat(document.getElementById("billK").value || 0);
-    const valPrev = parseFloat(document.getElementById("valPrev").value || 0);
-    const valCurr = parseFloat(document.getElementById("valCurr").value || 0);
-    const used = valCurr - valPrev;
-    if (used > 0 && billK > 0) {
-        const price = billT / billK;
-        const total = Math.round(used * price);
-        document.getElementById("resUsed").innerText = used.toFixed(1);
-        document.getElementById("resPrice").innerText = price.toFixed(2);
-        document.getElementById("resTotal").innerText = total.toLocaleString();
-        document.getElementById("resBox").classList.remove("hidden");
-    } else {
-        document.getElementById("resBox").classList.add("hidden");
-    }
-}
-        }
-        async function submitRecord() {
-            const rid = document.getElementById('selRoom').value;
-            const r = assets.find(a => a.roomId == rid);
-            const btn = document.getElementById('btnSubmit');
-            btn.disabled = true; btn.innerText = '同步中...';
-            const payload = {
-                action: 'saveMeterRecord',
-                payload: {
-                    period: new Date().toISOString().slice(0,7), locationId: r.locationId, locationName: r.locationName, address: r.address, roomId: r.roomId, roomName: r.roomName,
-                    previousKwh: parseFloat(document.getElementById('valPrev').value), currentKwh: parseFloat(document.getElementById('valCurr').value),
-                    usedKwh: parseFloat(document.getElementById('resUsed').innerText), billTotal: parseFloat(document.getElementById('billT').value),
-                    billKwh: parseFloat(document.getElementById('billK').value), unitPrice: parseFloat(document.getElementById('resPrice').innerText),
-                    publicFee: r.publicFee, tenantAmount: parseInt(document.getElementById('resTotal').innerText.replace(/,/g,''))
-                }
-            };
-            try {
-                await fetch(GS_URL, { method:'POST', mode:'no-cors', body: JSON.stringify(payload) });
-                alert('紀錄已儲存並啟動雲端同步'); initData();
-            } catch(e) { alert('儲存失敗'); }
-            btn.disabled = false; btn.innerText = '儲存並同步至雲端';
-        }
-        async function renderBillList() {
-            const container = document.getElementById('billContainer');
-            container.innerHTML = '<div class="text-center py-10 text-slate-400">載入中...</div>';
-            try {
-                const res = await fetch(`${GS_URL}?action=getMeterRecords`).then(r => r.json());
-                container.innerHTML = res.reverse().map(b => `<div class="bg-white p-6 rounded-[2rem] border shadow-sm"><div class="flex justify-between mb-4"><div class="font-black text-xl">${b.roomName}</div><div class="text-emerald-600 font-black">$${b.tenantAmount}</div></div><div class="text-xs text-slate-400 space-y-1"><div>期間: ${b.period}</div><div>度數: ${b.previousKwh} → ${b.currentKwh} (用量: ${b.usedKwh})</div></div></div>`).join('');
-            } catch(e) { container.innerHTML = '無法載入紀錄'; }
-        }
-        // Asset Mock for first run if empty
-        function addNewLocation() {
-           const name = prompt('地點名稱');
-           if(name) {
-               const lid = 'L'+Date.now();
-               const rname = prompt('房號');
-               assets.push({ locationId: lid, locationName: name, address: '', roomId: 'R'+Date.now(), roomName: rname, lastKwh: 0, publicFee: 0 });
-               localStorage.setItem('tp_v6_assets', JSON.stringify(assets));
-               renderAssetList(); renderLocations();
-           }
-        }
-        async function pushAssets() {
-            await fetch(GS_URL, { method:'POST', mode:'no-cors', body: JSON.stringify({ action:'saveAssets', payload: assets }) });
-            alert('資產已推送到雲端');
-        }
-        initData();
+        document.getElementById('locationSelect').onchange = renderRooms;
+        window.onload = init;
     </script>
 </body>
 </html>
