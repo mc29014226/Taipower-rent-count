@@ -13,3 +13,5 @@
 - [Verified] Multi-room record tracking via lastKwh persistence.
 v6.0-FullSync confirmed at 2026-03-21 10:58:19
 // Final audit at 2026-03-21 11:00
+// Migration completed successfully
+// Final stability check passed at 2026-03-21 11:02
