@@ -12,3 +12,4 @@
 - 2026-03-20: v3.0.0-pro stable release. Full migration to hierarchical property management (tp_assets) and 2026 tariff dynamic alerts.
 - [Verified] Multi-room record tracking via lastKwh persistence.
 v6.0-FullSync confirmed at 2026-03-21 10:58:19
+// Final audit at 2026-03-21 11:00
