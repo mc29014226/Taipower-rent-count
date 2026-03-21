@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="p-4 bg-slate-100">
+
+<h1 class="text-xl font-bold">帳單</h1>
+<div id="list"></div>
+
+<script>
+const GS="https://script.google.com/macros/s/AKfycbzW-Cv2scTGNwTv68xGhIpvYy5m0Hfn-bwWsLeRKdIRLnPuaooK8jRS4uiy6WTQnW4aXg/exec";
+
+async function load(){
+    const data=await fetch(GS+"?action=getMeterRecords").then(r=>r.json());
+    list.innerHTML=data.map(d=>`
+        <div class="bg-white p-3 m-2 rounded">
+            ${d.locationName} ${d.roomName} - $${d.tenantAmount}
+        </div>
+    `).join("");
+}
+
+load();
+</script>
+
+</body>
+</html>
