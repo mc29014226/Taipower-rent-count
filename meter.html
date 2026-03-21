@@ -5,65 +5,73 @@
 <script src="https://cdn.tailwindcss.com"></script>
 </head>
 
-<body class="p-4 bg-slate-100">
-<div class="max-w-xl mx-auto space-y-3">
+<body class="p-4 bg-gray-100">
 
-<select id="loc"></select>
-<select id="room"></select>
+<h1 class="text-xl font-bold mb-4">本期電費</h1>
 
-<input id="prev" readonly class="w-full p-2 border">
-<input id="curr" type="number" placeholder="本期度數" class="w-full p-2 border">
-<input id="billT" placeholder="總金額" class="w-full p-2 border">
-<input id="billK" placeholder="總度數" class="w-full p-2 border">
+<select id="loc" class="border p-2 w-full mb-2"></select>
+<select id="room" class="border p-2 w-full mb-2"></select>
 
-<button onclick="calc()" class="bg-blue-500 text-white p-2 w-full">計算</button>
+<input id="prev" readonly class="border p-2 w-full mb-2" placeholder="上期度數">
+<input id="curr" type="number" class="border p-2 w-full mb-2" placeholder="本期度數">
 
-<div id="res"></div>
+<input id="billT" type="number" class="border p-2 w-full mb-2" placeholder="台電總金額">
+<input id="billK" type="number" class="border p-2 w-full mb-2" placeholder="台電總度數">
+
+<button onclick="calc()" class="bg-blue-500 text-white p-2 w-full mb-2">計算</button>
+
+<div id="res" class="text-lg font-bold mb-2"></div>
 
 <button onclick="save()" class="bg-green-500 text-white p-2 w-full">同步</button>
 
-</div>
-
 <script>
 const GS="https://script.google.com/macros/s/AKfycbzW-Cv2scTGNwTv68xGhIpvYy5m0Hfn-bwWsLeRKdIRLnPuaooK8jRS4uiy6WTQnW4aXg/exec";
+
 let assets=[];
 
 async function init(){
-    assets=await fetch(GS+"?action=getAssets").then(r=>r.json());
-    renderLoc();
+assets=await fetch(GS+"?action=getAssets").then(r=>r.json());
+renderLoc();
 }
 
 function renderLoc(){
-    const map={};
-    assets.forEach(a=>map[a.locationId]=a.locationName);
-    loc.innerHTML=Object.entries(map).map(([id,n])=>`<option value=${id}>${n}</option>`).join("");
-    renderRoom();
+const map={};
+assets.forEach(a=>map[a.locationId]=a.locationName);
+
+loc.innerHTML=Object.entries(map)
+.map(([id,n])=>`<option value="${id}">${n}</option>`).join("");
+
+renderRoom();
 }
 
 function renderRoom(){
-    const rooms=assets.filter(a=>a.locationId==loc.value);
-    room.innerHTML=rooms.map(r=>`<option value=${r.roomId}>${r.roomName}</option>`).join("");
-    loadPrev();
+const rooms=assets.filter(a=>a.locationId==loc.value);
+
+room.innerHTML=rooms
+.map(r=>`<option value="${r.roomId}">${r.roomName}</option>`).join("");
+
+loadPrev();
 }
 
 function loadPrev(){
-    const a=assets.find(x=>x.roomId==room.value);
-    prev.value=a?.lastKwh||0;
+const a=assets.find(x=>x.roomId==room.value);
+prev.value=a?.lastKwh||0;
 }
 
 function calc(){
-    let used=curr.value-prev.value;
-    let price=billT.value/billK.value;
-    let total=Math.round(used*price);
-    res.innerText="金額："+total;
+let used=curr.value-prev.value;
+let price=billT.value/billK.value;
+let total=Math.round(used*price);
+
+res.innerText="應繳："+total;
 }
 
 async function save(){
-    await fetch(GS,{
-        method:"POST",
-        body:JSON.stringify({action:"saveMeterRecord"})
-    });
-    alert("已同步");
+await fetch(GS,{
+method:"POST",
+body:JSON.stringify({action:"saveMeterRecord"})
+});
+alert("已同步");
 }
 
 loc.onchange=renderRoom;
@@ -71,5 +79,6 @@ room.onchange=loadPrev;
 
 init();
 </script>
+
 </body>
 </html>
