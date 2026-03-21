@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="p-4 bg-slate-100">
+<div class="max-w-xl mx-auto space-y-3">
+
+<select id="loc"></select>
+<select id="room"></select>
+
+<input id="prev" readonly class="w-full p-2 border">
+<input id="curr" type="number" placeholder="本期度數" class="w-full p-2 border">
+<input id="billT" placeholder="總金額" class="w-full p-2 border">
+<input id="billK" placeholder="總度數" class="w-full p-2 border">
+
+<button onclick="calc()" class="bg-blue-500 text-white p-2 w-full">計算</button>
+
+<div id="res"></div>
+
+<button onclick="save()" class="bg-green-500 text-white p-2 w-full">同步</button>
+
+</div>
+
+<script>
+const GS="你的GAS網址";
+let assets=[];
+
+async function init(){
+    assets=await fetch(GS+"?action=getAssets").then(r=>r.json());
+    renderLoc();
+}
+
+function renderLoc(){
+    const map={};
+    assets.forEach(a=>map[a.locationId]=a.locationName);
+    loc.innerHTML=Object.entries(map).map(([id,n])=>`<option value=${id}>${n}</option>`).join("");
+    renderRoom();
+}
+
+function renderRoom(){
+    const rooms=assets.filter(a=>a.locationId==loc.value);
+    room.innerHTML=rooms.map(r=>`<option value=${r.roomId}>${r.roomName}</option>`).join("");
+    loadPrev();
+}
+
+function loadPrev(){
+    const a=assets.find(x=>x.roomId==room.value);
+    prev.value=a?.lastKwh||0;
+}
+
+function calc(){
+    let used=curr.value-prev.value;
+    let price=billT.value/billK.value;
+    let total=Math.round(used*price);
+    res.innerText="金額："+total;
+}
+
+async function save(){
+    await fetch(GS,{
+        method:"POST",
+        body:JSON.stringify({action:"saveMeterRecord"})
+    });
+    alert("已同步");
+}
+
+loc.onchange=renderRoom;
+room.onchange=loadPrev;
+
+init();
+</script>
+</body>
+</html>
