@@ -1,38 +1,364 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-Hant">
 <head>
-<meta charset="UTF-8">
-<script src="https://cdn.tailwindcss.com"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>歷史帳單查詢</title>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
+<body class="bg-slate-100 min-h-screen text-slate-800">
+  <div class="max-w-6xl mx-auto px-4 py-8">
+    <div class="bg-white rounded-2xl shadow-lg p-6 md:p-8">
+      <div class="flex items-center justify-between gap-3 mb-6">
+        <div>
+          <h1 class="text-2xl md:text-3xl font-bold text-slate-900">歷史帳單查詢</h1>
+          <p class="text-slate-500 mt-2">查詢各地點、房號、帳單群組的歷史抄表與分攤紀錄。</p>
+        </div>
+        <a href="./index.html" class="text-blue-600 hover:underline text-sm whitespace-nowrap">← 返回主頁</a>
+      </div>
 
-<body class="p-4 bg-gray-100">
+      <div id="statusBar" class="hidden rounded-xl px-4 py-3 text-sm font-medium mb-6"></div>
 
-<h1 class="text-xl font-bold mb-4">房客電費</h1>
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div>
+          <label class="block text-sm font-medium mb-2">地點</label>
+          <select id="locationFilter" class="w-full rounded-xl border border-slate-300 px-4 py-3 bg-white">
+            <option value="">全部地點</option>
+          </select>
+        </div>
 
-<button onclick="load()" class="bg-blue-500 text-white p-2 w-full mb-3">
-讀取帳單
-</button>
+        <div>
+          <label class="block text-sm font-medium mb-2">房號</label>
+          <select id="roomFilter" class="w-full rounded-xl border border-slate-300 px-4 py-3 bg-white">
+            <option value="">全部房號</option>
+          </select>
+        </div>
 
-<div id="list"></div>
+        <div>
+          <label class="block text-sm font-medium mb-2">帳單群組</label>
+          <select id="billGroupFilter" class="w-full rounded-xl border border-slate-300 px-4 py-3 bg-white">
+            <option value="">全部群組</option>
+          </select>
+        </div>
 
-<script>
-const GS="https://script.google.com/macros/s/AKfycbzW-Cv2scTGNwTv68xGhIpvYy5m0Hfn-bwWsLeRKdIRLnPuaooK8jRS4uiy6WTQnW4aXg/exec";
+        <div>
+          <label class="block text-sm font-medium mb-2">關鍵字</label>
+          <input id="keywordFilter" type="text" class="w-full rounded-xl border border-slate-300 px-4 py-3 bg-white" placeholder="搜尋備註、房號、地點">
+        </div>
+      </div>
 
-async function load(){
-const data=await fetch(GS+"?action=getMeterRecords").then(r=>r.json());
+      <div class="mt-4 flex flex-wrap gap-3">
+        <button id="reloadBtn" class="rounded-xl bg-slate-700 hover:bg-slate-800 text-white px-5 py-3 font-medium">
+          重新載入資料
+        </button>
+        <button id="clearFilterBtn" class="rounded-xl bg-slate-500 hover:bg-slate-600 text-white px-5 py-3 font-medium">
+          清除篩選
+        </button>
+      </div>
 
-list.innerHTML=data.map(d=>`
-<div class="bg-white p-3 mb-2 rounded shadow">
-<div class="font-bold">${d.locationName} ${d.roomName}</div>
-<div>上期：${d.previousKwh}</div>
-<div>本期：${d.currentKwh}</div>
-<div>用量：${d.usedKwh}</div>
-<div>單價：${d.unitPrice}</div>
-<div class="text-green-600 font-bold">應繳：${d.tenantAmount}</div>
-</div>
-`).join("");
-}
-</script>
+      <div class="mt-8 flex items-center justify-between">
+        <h2 class="text-xl font-bold text-slate-900">查詢結果</h2>
+        <div class="text-sm text-slate-500">
+          共 <span id="countText">0</span> 筆
+        </div>
+      </div>
 
+      <div id="emptyText" class="mt-4 text-slate-400 text-sm">尚無資料</div>
+      <div id="list" class="mt-4 space-y-4"></div>
+    </div>
+  </div>
+
+  <script>
+    const GAS_URL = 'https://script.google.com/macros/s/AKfycbzW-Cv2scTGNwTv68xGhIpvYy5m0Hfn-bwWsLeRKdIRLnPuaooK8jRS4uiy6WTQnW4aXg/exec';
+
+    const state = {
+      meterRecords: []
+    };
+
+    const el = {
+      locationFilter: document.getElementById('locationFilter'),
+      roomFilter: document.getElementById('roomFilter'),
+      billGroupFilter: document.getElementById('billGroupFilter'),
+      keywordFilter: document.getElementById('keywordFilter'),
+      reloadBtn: document.getElementById('reloadBtn'),
+      clearFilterBtn: document.getElementById('clearFilterBtn'),
+      countText: document.getElementById('countText'),
+      emptyText: document.getElementById('emptyText'),
+      list: document.getElementById('list'),
+      statusBar: document.getElementById('statusBar')
+    };
+
+    function showStatus(message, type = 'info') {
+      el.statusBar.classList.remove(
+        'hidden',
+        'bg-blue-50', 'text-blue-700',
+        'bg-red-50', 'text-red-700',
+        'bg-green-50', 'text-green-700',
+        'bg-amber-50', 'text-amber-700'
+      );
+
+      if (type === 'success') {
+        el.statusBar.classList.add('bg-green-50', 'text-green-700');
+      } else if (type === 'error') {
+        el.statusBar.classList.add('bg-red-50', 'text-red-700');
+      } else if (type === 'warning') {
+        el.statusBar.classList.add('bg-amber-50', 'text-amber-700');
+      } else {
+        el.statusBar.classList.add('bg-blue-50', 'text-blue-700');
+      }
+
+      el.statusBar.textContent = message;
+    }
+
+    async function fetchJson(url) {
+      const response = await fetch(url, { method: 'GET' });
+      const text = await response.text();
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status} | ${text.slice(0, 200)}`);
+      }
+
+      try {
+        return JSON.parse(text);
+      } catch {
+        throw new Error(`JSON 解析失敗 | 回傳內容：${text.slice(0, 200)}`);
+      }
+    }
+
+    function normalizeRecord(item) {
+      return {
+        location: String(item.location || '').trim(),
+        room: String(item.room || '').trim(),
+        billGroup: String(item.billGroup || '').trim(),
+        previousKwh: Number(item.previousKwh || 0),
+        currentKwh: Number(item.currentKwh || 0),
+        usedKwh: Number(item.usedKwh || 0),
+        billTotal: Number(item.billTotal || 0),
+        publicFee: Number(item.publicFee || 0),
+        usageAmount: Number(item.usageAmount || 0),
+        tenantAmount: Number(item.tenantAmount || 0),
+        remark: String(item.remark || '').trim(),
+        createdAt: String(item.createdAt || '').trim()
+      };
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+    }
+
+    function formatDateTime(value) {
+      if (!value) return '-';
+
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return value;
+
+      const yyyy = date.getFullYear();
+      const mm = String(date.getMonth() + 1).padStart(2, '0');
+      const dd = String(date.getDate()).padStart(2, '0');
+      const hh = String(date.getHours()).padStart(2, '0');
+      const mi = String(date.getMinutes()).padStart(2, '0');
+      const ss = String(date.getSeconds()).padStart(2, '0');
+
+      return `${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`;
+    }
+
+    function sortRecords(records) {
+      return records.slice().sort((a, b) => {
+        const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return bTime - aTime;
+      });
+    }
+
+    function getUniqueValues(key) {
+      return [...new Set(
+        state.meterRecords
+          .map(item => String(item[key] || '').trim())
+          .filter(Boolean)
+      )].sort((a, b) => a.localeCompare(b, 'zh-Hant', { numeric: true }));
+    }
+
+    function renderFilters() {
+      const currentLocation = el.locationFilter.value;
+      const currentRoom = el.roomFilter.value;
+      const currentBillGroup = el.billGroupFilter.value;
+
+      el.locationFilter.innerHTML = '<option value="">全部地點</option>';
+      getUniqueValues('location').forEach(value => {
+        const option = document.createElement('option');
+        option.value = value;
+        option.textContent = value;
+        el.locationFilter.appendChild(option);
+      });
+
+      el.roomFilter.innerHTML = '<option value="">全部房號</option>';
+      getUniqueValues('room').forEach(value => {
+        const option = document.createElement('option');
+        option.value = value;
+        option.textContent = value;
+        el.roomFilter.appendChild(option);
+      });
+
+      el.billGroupFilter.innerHTML = '<option value="">全部群組</option>';
+      getUniqueValues('billGroup').forEach(value => {
+        const option = document.createElement('option');
+        option.value = value;
+        option.textContent = value;
+        el.billGroupFilter.appendChild(option);
+      });
+
+      if (getUniqueValues('location').includes(currentLocation)) {
+        el.locationFilter.value = currentLocation;
+      }
+      if (getUniqueValues('room').includes(currentRoom)) {
+        el.roomFilter.value = currentRoom;
+      }
+      if (getUniqueValues('billGroup').includes(currentBillGroup)) {
+        el.billGroupFilter.value = currentBillGroup;
+      }
+    }
+
+    function getFilteredRecords() {
+      const location = String(el.locationFilter.value || '').trim();
+      const room = String(el.roomFilter.value || '').trim();
+      const billGroup = String(el.billGroupFilter.value || '').trim();
+      const keyword = String(el.keywordFilter.value || '').trim().toLowerCase();
+
+      return sortRecords(state.meterRecords).filter(item => {
+        const matchLocation = !location || item.location === location;
+        const matchRoom = !room || item.room === room;
+        const matchBillGroup = !billGroup || item.billGroup === billGroup;
+
+        const targetText = [
+          item.location,
+          item.room,
+          item.billGroup,
+          item.remark,
+          formatDateTime(item.createdAt)
+        ].join(' ').toLowerCase();
+
+        const matchKeyword = !keyword || targetText.includes(keyword);
+
+        return matchLocation && matchRoom && matchBillGroup && matchKeyword;
+      });
+    }
+
+    function renderList() {
+      const records = getFilteredRecords();
+      el.list.innerHTML = '';
+      el.countText.textContent = String(records.length);
+
+      if (!records.length) {
+        el.emptyText.classList.remove('hidden');
+        return;
+      }
+
+      el.emptyText.classList.add('hidden');
+
+      records.forEach(item => {
+        const card = document.createElement('div');
+        card.className = 'bg-slate-50 border rounded-2xl p-5';
+
+        card.innerHTML = `
+          <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+            <div>
+              <div class="text-xl font-bold text-slate-900">
+                ${escapeHtml(item.location)} / ${escapeHtml(item.room)}
+              </div>
+              <div class="text-sm text-slate-600 mt-1">帳單群組：${escapeHtml(item.billGroup || '-')}</div>
+              <div class="text-sm text-slate-500 mt-1">建立時間：${escapeHtml(formatDateTime(item.createdAt))}</div>
+            </div>
+            <div class="text-right">
+              <div class="text-sm text-slate-500">租客應繳總額</div>
+              <div class="text-2xl font-bold text-emerald-700">${Math.round(item.tenantAmount)} 元</div>
+            </div>
+          </div>
+
+          <div class="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+            <div class="bg-white rounded-xl border p-3">
+              <div class="text-slate-500">上期度數</div>
+              <div class="font-bold mt-1">${item.previousKwh}</div>
+            </div>
+            <div class="bg-white rounded-xl border p-3">
+              <div class="text-slate-500">本期度數</div>
+              <div class="font-bold mt-1">${item.currentKwh}</div>
+            </div>
+            <div class="bg-white rounded-xl border p-3">
+              <div class="text-slate-500">使用度數</div>
+              <div class="font-bold mt-1">${item.usedKwh}</div>
+            </div>
+            <div class="bg-white rounded-xl border p-3">
+              <div class="text-slate-500">台電總金額</div>
+              <div class="font-bold mt-1">${Math.round(item.billTotal)} 元</div>
+            </div>
+            <div class="bg-white rounded-xl border p-3">
+              <div class="text-slate-500">公電費</div>
+              <div class="font-bold mt-1">${Math.round(item.publicFee)} 元</div>
+            </div>
+            <div class="bg-white rounded-xl border p-3">
+              <div class="text-slate-500">用電分攤金額</div>
+              <div class="font-bold mt-1">${Math.round(item.usageAmount)} 元</div>
+            </div>
+            <div class="bg-white rounded-xl border p-3 md:col-span-2">
+              <div class="text-slate-500">備註</div>
+              <div class="font-bold mt-1 break-words">${escapeHtml(item.remark || '-')}</div>
+            </div>
+          </div>
+        `;
+
+        el.list.appendChild(card);
+      });
+    }
+
+    async function loadRecords() {
+      try {
+        el.reloadBtn.disabled = true;
+        el.reloadBtn.textContent = '載入中...';
+
+        const result = await fetchJson(`${GAS_URL}?action=getMeterRecords`);
+        state.meterRecords = Array.isArray(result.data) ? result.data.map(normalizeRecord) : [];
+
+        renderFilters();
+        renderList();
+        showStatus('已成功載入歷史帳單資料。', 'success');
+      } catch (error) {
+        showStatus(`載入失敗：${error.message}`, 'error');
+      } finally {
+        el.reloadBtn.disabled = false;
+        el.reloadBtn.textContent = '重新載入資料';
+      }
+    }
+
+    function clearFilters() {
+      el.locationFilter.value = '';
+      el.roomFilter.value = '';
+      el.billGroupFilter.value = '';
+      el.keywordFilter.value = '';
+      renderList();
+      showStatus('已清除篩選條件。', 'info');
+    }
+
+    function bindEvents() {
+      el.reloadBtn.addEventListener('click', loadRecords);
+      el.clearFilterBtn.addEventListener('click', clearFilters);
+      el.locationFilter.addEventListener('change', renderList);
+      el.roomFilter.addEventListener('change', renderList);
+      el.billGroupFilter.addEventListener('change', renderList);
+      el.keywordFilter.addEventListener('input', renderList);
+    }
+
+    async function init() {
+      bindEvents();
+      showStatus('正在載入歷史帳單資料...', 'info');
+      await loadRecords();
+    }
+
+    init();
+  </script>
 </body>
 </html>
