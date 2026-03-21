@@ -338,25 +338,29 @@
       el.emptyGroupText.classList.add('hidden');
       el.summaryCard.classList.add('hidden');
     }
-
-    function bindCurrentInputs() {
-      document.querySelectorAll('.group-current-kwh').forEach(input => {
-        input.addEventListener('input', () => {
-          const index = Number(input.dataset.index);
-          const current = Number(input.value || 0);
-          const item = state.selectedGroupRooms[index];
-          if (!item) return;
-
-          item.currentKwh = input.value === '' ? '' : current;
-          item.usedKwh = input.value === '' ? 0 : Math.max(0, current - item.previousKwh);
-
-          const row = input.closest('tr');
-          if (row) {
-            row.querySelector('.used-kwh-cell').textContent = String(item.usedKwh);
-          }
-        });
+    
+  function bindCurrentInputs() {
+    document.querySelectorAll('.group-current-kwh').forEach(input => {
+      input.addEventListener('input', () => {
+        const index = Number(input.dataset.index);
+        const current = Number(input.value || 0);
+        const item = state.selectedGroupRooms[index];
+        if (!item) return;
+  
+        item.currentKwh = input.value === '' ? '' : current;
+        item.usedKwh = input.value === '' ? 0 : Math.max(0, current - item.previousKwh);
+  
+        const row = input.closest('tr');
+        if (row) {
+          row.querySelector('.used-kwh-cell').textContent = String(item.usedKwh);
+        }
+  
+        if (el.billTotal.value !== '') {
+          calculateGroup();
+        }
       });
-    }
+    });
+  }
 
     function escapeHtml(value) {
       return String(value)
