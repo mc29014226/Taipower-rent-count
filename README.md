@@ -2,7 +2,7 @@
 
 ## 🚀 部署資訊
 - **Live Demo:** https://mc29014226.github.io/Taipower-rent-count/
-- **GAS API:** https://script.google.com/macros/s/AKfycbzW-Cv2scTGNwTv68xGhIpvYy5m0Hfn-bwWsLeRKdIRLnPuaooK8jRS4uiy6WTQnW4aXg/exec
+- **Bill Histroy:** https://mc29014226.github.io/Taipower-rent-count/bill.html
 
 ## 🛠 技術棧
 - Tailwind CSS (Dark Mode)
