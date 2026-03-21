@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>租屋電力雲 v5.0</title>
+    <title>租屋電力雲 v6.0 - 雲端實體化</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         .page { display: none; } .page.active { display: block; }
@@ -11,64 +11,191 @@
         .print-only { display: none; }
     </style>
 </head>
-<body class="bg-slate-50 min-h-screen pb-24 font-sans">
-    <header class="bg-indigo-700 text-white p-4 shadow-md sticky top-0 z-50 flex justify-between items-center no-print">
-        <h1 class="text-lg font-bold">Taipower Pro <span class="text-xs opacity-75">v5.0</span></h1>
-        <div id="syncStatus" class="text-[10px] bg-indigo-800 px-2 py-1 rounded">雲端同步模式</div>
+<body class="bg-slate-100 min-h-screen pb-24 font-sans text-slate-900">
+    <header class="bg-slate-900 text-white p-4 shadow-lg sticky top-0 z-50 flex justify-between items-center no-print">
+        <h1 class="text-lg font-bold tracking-tighter italic">POWER-RENT <span class="text-emerald-400 not-italic">v6.0</span></h1>
+        <button onclick="initData()" class="text-xs bg-slate-800 px-3 py-1 rounded-full border border-slate-700">🔄 同步雲端</button>
     </header>
-    <div class="max-w-md mx-auto p-4">
+    <main class="max-w-xl mx-auto p-4">
         <section id="page-setup" class="page">
-            <h2 class="text-xl font-black text-slate-800 mb-4">⚙️ 資產設定</h2>
-            <div class="bg-white p-4 rounded-2xl shadow-sm mb-6 border border-slate-200">
-                <label class="text-[10px] font-bold text-slate-400">GAS API URL</label>
-                <input id="cfgUrl" type="text" class="w-full text-sm border-b py-2 outline-none focus:border-indigo-500">
-                <button onclick="saveCfg()" class="w-full mt-3 bg-indigo-50 text-indigo-600 font-bold py-2 rounded-lg text-sm">儲存設定</button>
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-black">資產主檔設定</h2>
+                <button onclick="pushAssets()" class="bg-emerald-600 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg shadow-emerald-200">同步資產到雲端</button>
             </div>
-            <div id="assetContainer" class="space-y-4"></div>
-            <button onclick="addLocation()" class="w-full mt-6 py-4 border-2 border-dashed border-slate-300 rounded-2xl text-slate-400 font-bold">+ 新增房產地點</button>
+            <div id="assetList" class="space-y-4"></div>
+            <button onclick="addNewLocation()" class="w-full mt-6 py-6 border-2 border-dashed border-slate-300 rounded-3xl text-slate-400 font-bold hover:bg-white">+ 新增房產地點</button>
         </section>
         <section id="page-input" class="page active">
-            <h2 class="text-xl font-black text-slate-800 mb-4">⚡ 度數錄入</h2>
-            <div class="bg-white p-6 rounded-3xl shadow-xl border border-slate-100 space-y-5">
-                <select id="selLoc" onchange="updateRoomOptions()" class="w-full p-3 bg-slate-50 rounded-xl border-none ring-1 ring-slate-200"></select>
-                <select id="selRoom" onchange="loadLastReadings()" class="w-full p-3 bg-slate-50 rounded-xl border-none ring-1 ring-slate-200"></select>
+            <h2 class="text-2xl font-black mb-6">度數錄入同步</h2>
+            <div class="bg-white p-6 rounded-[2rem] shadow-xl border border-slate-200 space-y-6">
                 <div class="grid grid-cols-2 gap-4">
-                    <div class="bg-slate-50 p-3 rounded-2xl"><label class="text-[10px] text-slate-400">上次度數</label><input id="valPrev" type="number" readonly class="w-full bg-transparent font-mono font-bold outline-none"></div>
-                    <div class="bg-indigo-50 p-3 rounded-2xl ring-1 ring-indigo-200"><label class="text-[10px] text-indigo-400">本次度數</label><input id="valCurr" type="number" oninput="calculate()" class="w-full bg-transparent font-mono font-bold outline-none"></div>
+                    <div class="space-y-1">
+                        <label class="text-xs font-bold text-slate-400">地點</label>
+                        <select id="selLoc" onchange="renderRooms()" class="w-full p-3 bg-slate-50 rounded-2xl outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-slate-900 transition-all"></select>
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-xs font-bold text-slate-400">房間</label>
+                        <select id="selRoom" onchange="syncLastReading()" class="w-full p-3 bg-slate-50 rounded-2xl outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-slate-900 transition-all"></select>
+                    </div>
                 </div>
                 <div class="grid grid-cols-2 gap-4">
-                    <input id="billTotal" type="number" placeholder="總金額" oninput="calculate()" class="p-3 bg-slate-50 rounded-xl text-sm outline-none ring-1 ring-slate-200">
-                    <input id="billKwh" type="number" placeholder="總度數" oninput="calculate()" class="p-3 bg-slate-50 rounded-xl text-sm outline-none ring-1 ring-slate-200">
+                    <div class="bg-slate-50 p-4 rounded-3xl relative">
+                        <label class="text-[10px] font-bold text-slate-400 uppercase">上期度數</label>
+                        <div id="readingSource" class="absolute top-4 right-4 text-[8px] bg-emerald-100 text-emerald-700 px-1 rounded">CLOUD</div>
+                        <input id="valPrev" type="number" readonly class="w-full bg-transparent text-xl font-mono font-bold">
+                    </div>
+                    <div class="bg-slate-900 p-4 rounded-3xl text-white ring-4 ring-emerald-400/20">
+                        <label class="text-[10px] font-bold text-slate-500 uppercase">本次度數</label>
+                        <input id="valCurr" type="number" oninput="calc()" class="w-full bg-transparent text-xl font-mono font-bold text-emerald-400 outline-none">
+                    </div>
                 </div>
-                <div id="resultBox" class="hidden bg-slate-900 text-white p-5 rounded-2xl">
-                    <div class="flex justify-between items-end border-t border-slate-700 pt-2"><span class="text-sm">房客應繳</span><span class="text-2xl font-black text-yellow-400">$ <span id="resAmount">0</span></span></div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="space-y-1">
+                        <label class="text-xs font-bold text-slate-400 uppercase">台電總金額</label>
+                        <input id="billT" type="number" oninput="calc()" class="w-full p-3 bg-slate-50 rounded-2xl ring-1 ring-slate-200 outline-none">
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-xs font-bold text-slate-400 uppercase">台電總度數</label>
+                        <input id="billK" type="number" oninput="calc()" class="w-full p-3 bg-slate-50 rounded-2xl ring-1 ring-slate-200 outline-none">
+                    </div>
                 </div>
-                <button id="btnSubmit" onclick="submitToGas()" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold shadow-lg shadow-indigo-200">確認同步至雲端</button>
+                <div id="resBox" class="hidden bg-slate-50 p-6 rounded-3xl space-y-3">
+                    <div class="flex justify-between text-sm"><span>使用度數</span><span id="resUsed" class="font-mono font-bold">0</span></div>
+                    <div class="flex justify-between text-sm"><span>每度單價</span><span id="resPrice" class="font-mono">0</span></div>
+                    <div class="flex justify-between items-end border-t border-slate-200 pt-3">
+                        <span class="font-bold">應繳總額 (+公電)</span>
+                        <span class="text-3xl font-black text-slate-900">$ <span id="resTotal">0</span></span>
+                    </div>
+                </div>
+                <button onclick="submitRecord()" id="btnSubmit" class="w-full bg-slate-900 text-white py-5 rounded-3xl font-bold text-lg hover:bg-slate-800 transition-colors shadow-2xl shadow-slate-300 active:scale-95">儲存並同步至雲端</button>
             </div>
         </section>
-        <section id="page-bill" class="page"><h2 class="text-xl font-black mb-4">🧾 帳單紀錄</h2><div id="historyContainer" class="space-y-4"></div></section>
-    </div>
-    <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 flex justify-around p-3 pb-6 z-50 no-print">
-        <button onclick="switchPage('setup')" class="flex flex-col items-center gap-1 text-slate-400 focus:text-indigo-600"><span class="text-xl">⚙️</span><span class="text-[10px] font-bold">資產設定</span></button>
-        <button onclick="switchPage('input')" class="flex flex-col items-center gap-1 text-slate-400 focus:text-indigo-600"><span class="text-xl">⚡</span><span class="text-[10px] font-bold">度數錄入</span></button>
-        <button onclick="switchPage('bill')" class="flex flex-col items-center gap-1 text-slate-400 focus:text-indigo-600"><span class="text-xl">🧾</span><span class="text-[10px] font-bold">帳單紀錄</span></button>
+        <section id="page-bill" class="page">
+            <div class="flex justify-between items-center mb-6 no-print">
+                <h2 class="text-2xl font-black">帳單明細</h2>
+                <button onclick="window.print()" class="bg-slate-200 px-4 py-2 rounded-xl text-xs font-bold">🖨️ 列印</button>
+            </div>
+            <div id="billContainer" class="space-y-6"></div>
+        </section>
+    </main>
+    <nav class="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-xl border-t border-slate-200 flex justify-around p-3 pb-8 z-50 no-print">
+        <button onclick="switchPage('setup')" class="flex flex-col items-center gap-1 text-slate-400"><span class="text-xl">⚙️</span><span class="text-[10px] font-black">資產</span></button>
+        <button onclick="switchPage('input')" class="flex flex-col items-center gap-1 text-slate-900"><span class="text-xl">⚡</span><span class="text-[10px] font-black">錄入</span></button>
+        <button onclick="switchPage('bill')" class="flex flex-col items-center gap-1 text-slate-400"><span class="text-xl">🧾</span><span class="text-[10px] font-black">帳單</span></button>
     </nav>
     <script>
-        let assets = JSON.parse(localStorage.getItem('tp_assets') || '{"locations":[]}');
-        let config = JSON.parse(localStorage.getItem('tp_config') || '{"url":""}');
-        function switchPage(p) { document.querySelectorAll('.page').forEach(el => el.classList.remove('active')); document.getElementById('page-' + p).classList.add('active'); if(p === 'setup') renderAssets(); if(p === 'input') renderInputOptions(); if(p === 'bill') fetchHistory(); }
-        function renderAssets() { document.getElementById('cfgUrl').value = config.url; document.getElementById('assetContainer').innerHTML = assets.locations.map(loc => `<div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200"><div class="flex justify-between font-black text-slate-800"><span>${loc.name}</span><button onclick="addRoom('${loc.id}')" class="text-xs text-indigo-500 font-bold">+房間</button></div><div class="mt-2 space-y-1">${loc.rooms.map(r => `<div class="text-sm text-slate-500">• ${r.name} (公電$${r.publicFee})</div>`).join('')}</div></div>`).join(''); }
-        function addLocation() { const n = prompt('地點名稱'); if(n) { assets.locations.push({ id: 'loc_'+Date.now(), name: n, rooms: [] }); saveLocal(); } }
-        function addRoom(id) { const l = assets.locations.find(x => x.id === id); const n = prompt('房號'); const k = prompt('初始度數','0'); const f = prompt('公電','0'); if(n) { l.rooms.push({ id:'rm_'+Date.now(), name:n, lastKwh:parseFloat(k), publicFee:parseFloat(f) }); saveLocal(); } }
-        function saveCfg() { config.url = document.getElementById('cfgUrl').value; localStorage.setItem('tp_config', JSON.stringify(config)); alert('已儲存'); }
-        function saveLocal() { localStorage.setItem('tp_assets', JSON.stringify(assets)); renderAssets(); }
-        function renderInputOptions() { document.getElementById('selLoc').innerHTML = assets.locations.map(l => `<option value="${l.id}">${l.name}</option>`).join(''); updateRoomOptions(); }
-        function updateRoomOptions() { const l = assets.locations.find(x => x.id === document.getElementById('selLoc').value); document.getElementById('selRoom').innerHTML = (l?.rooms || []).map(r => `<option value="${r.id}">${r.name}</option>`).join(''); loadLastReadings(); }
-        function loadLastReadings() { const l = assets.locations.find(x => x.id === document.getElementById('selLoc').value); const r = l?.rooms.find(x => x.id === document.getElementById('selRoom').value); document.getElementById('valPrev').value = r?.lastKwh || 0; calculate(); }
-        function calculate() { const p = parseFloat(document.getElementById('valPrev').value); const c = parseFloat(document.getElementById('valCurr').value || 0); const t = parseFloat(document.getElementById('billTotal').value || 0); const k = parseFloat(document.getElementById('billKwh').value || 1); if(c > 0) { const l = assets.locations.find(x => x.id === document.getElementById('selLoc').value); const r = l?.rooms.find(x => x.id === document.getElementById('selRoom').value); const amt = Math.round((c-p)*(t/k) + (r?.publicFee || 0)); document.getElementById('resAmount').innerText = amt.toLocaleString(); document.getElementById('resultBox').classList.remove('hidden'); } }
-        async function submitToGas() { if(!config.url) return alert('未設定 URL'); const l = assets.locations.find(x => x.id === document.getElementById('selLoc').value); const r = l.rooms.find(x => x.id === document.getElementById('selRoom').value); const payload = { action:'saveMeterRecord', payload: { locId:l.id, locName:l.name, roomId:r.id, roomName:r.name, prev:parseFloat(document.getElementById('valPrev').value), curr:parseFloat(document.getElementById('valCurr').value), total:document.getElementById('resAmount').innerText } }; await fetch(config.url, { method:'POST', mode:'no-cors', body:JSON.stringify(payload) }); r.lastKwh = payload.payload.curr; saveLocal(); alert('同步成功並回寫度數'); switchPage('bill'); }
-        async function fetchHistory() { if(!config.url) return; const res = await fetch(config.url + '?action=getMeterRecords'); const json = await res.json(); document.getElementById('historyContainer').innerHTML = json.data.reverse().map(b => `<div class="bg-white p-4 rounded-xl border border-slate-200"><div class="flex justify-between font-black"><span>${b.roomName}</span><span class="text-indigo-600">$${b.total}</span></div><div class="text-[10px] text-slate-400">${b.locName} | 度數: ${b.prev}→${b.curr}</div></div>`).join(''); }
-        renderInputOptions();
+        const GS_URL = "https://script.google.com/macros/s/AKfycbzW-Cv2scTGNwTv68xGhIpvYy5m0Hfn-bwWsLeRKdIRLnPuaooK8jRS4uiy6WTQnW4aXg/exec";
+        let assets = JSON.parse(localStorage.getItem('tp_v6_assets') || '[]');
+        let latestReadings = [];
+        async function initData() {
+            try {
+                const [resA, resL] = await Promise.all([
+                    fetch(`${GS_URL}?action=getAssets`).then(r => r.json()),
+                    fetch(`${GS_URL}?action=getLatestReadings`).then(r => r.json())
+                ]);
+                assets = Array.isArray(resA) ? resA : []; 
+                latestReadings = Array.isArray(resL) ? resL : [];
+                localStorage.setItem('tp_v6_assets', JSON.stringify(assets));
+                renderLocations();
+                alert('雲端同步成功');
+            } catch(e) { console.error(e); }
+        }
+        function switchPage(p) {
+            document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
+            document.getElementById('page-' + p).classList.add('active');
+            if(p === 'setup') renderAssetList();
+            if(p === 'bill') renderBillList();
+        }
+        function renderAssetList() {
+            const container = document.getElementById('assetList');
+            container.innerHTML = assets.length ? assets.map(a => `<div class="bg-white p-4 rounded-2xl border shadow-sm"><div class="font-bold">${a.locationName}</div><div class="text-sm text-slate-500">${a.roomName} (公電: $${a.publicFee})</div></div>`).join('') : '<div class="text-center py-10 text-slate-400">尚未建立資產資料</div>';
+        }
+        function renderLocations() {
+            const sel = document.getElementById('selLoc');
+            const unique = [...new Set(assets.map(a => a.locationId))];
+            sel.innerHTML = unique.map(id => {
+                const l = assets.find(a => a.locationId === id);
+                return `<option value="${id}">${l.locationName}</option>`;
+            }).join('');
+            if(unique.length) renderRooms();
+        }
+        function renderRooms() {
+            const lid = document.getElementById('selLoc').value;
+            const sel = document.getElementById('selRoom');
+            sel.innerHTML = assets.filter(a => a.locationId === lid).map(r => `<option value="${r.roomId}">${r.roomName}</option>`).join('');
+            syncLastReading();
+        }
+        function syncLastReading() {
+            const lid = document.getElementById('selLoc').value;
+            const rid = document.getElementById('selRoom').value;
+            const cloud = latestReadings.find(l => l.locationId == lid && l.roomId == rid);
+            const asset = assets.find(a => a.roomId == rid);
+            document.getElementById('valPrev').value = cloud ? cloud.latestKwh : (asset ? asset.lastKwh : 0);
+            document.getElementById('readingSource').innerText = cloud ? 'CLOUD' : 'ASSET';
+            calc();
+        }
+        function calc() {
+            const prev = parseFloat(document.getElementById('valPrev').value || 0);
+            const curr = parseFloat(document.getElementById('valCurr').value || 0);
+            const billT = parseFloat(document.getElementById('billT').value || 0);
+            const billK = parseFloat(document.getElementById('billK').value || 1);
+            if(curr > prev) {
+                const used = curr - prev;
+                const price = billT / billK;
+                const rid = document.getElementById('selRoom').value;
+                const r = assets.find(a => a.roomId == rid);
+                const total = Math.round(used * price + (r ? r.publicFee : 0));
+                document.getElementById('resUsed').innerText = used.toFixed(1);
+                document.getElementById('resPrice').innerText = price.toFixed(2);
+                document.getElementById('resTotal').innerText = total.toLocaleString();
+                document.getElementById('resBox').classList.remove('hidden');
+            } else { document.getElementById('resBox').classList.add('hidden'); }
+        }
+        async function submitRecord() {
+            const rid = document.getElementById('selRoom').value;
+            const r = assets.find(a => a.roomId == rid);
+            const btn = document.getElementById('btnSubmit');
+            btn.disabled = true; btn.innerText = '同步中...';
+            const payload = {
+                action: 'saveMeterRecord',
+                payload: {
+                    period: new Date().toISOString().slice(0,7), locationId: r.locationId, locationName: r.locationName, address: r.address, roomId: r.roomId, roomName: r.roomName,
+                    previousKwh: parseFloat(document.getElementById('valPrev').value), currentKwh: parseFloat(document.getElementById('valCurr').value),
+                    usedKwh: parseFloat(document.getElementById('resUsed').innerText), billTotal: parseFloat(document.getElementById('billT').value),
+                    billKwh: parseFloat(document.getElementById('billK').value), unitPrice: parseFloat(document.getElementById('resPrice').innerText),
+                    publicFee: r.publicFee, tenantAmount: parseInt(document.getElementById('resTotal').innerText.replace(/,/g,''))
+                }
+            };
+            try {
+                await fetch(GS_URL, { method:'POST', mode:'no-cors', body: JSON.stringify(payload) });
+                alert('紀錄已儲存並啟動雲端同步'); initData();
+            } catch(e) { alert('儲存失敗'); }
+            btn.disabled = false; btn.innerText = '儲存並同步至雲端';
+        }
+        async function renderBillList() {
+            const container = document.getElementById('billContainer');
+            container.innerHTML = '<div class="text-center py-10 text-slate-400">載入中...</div>';
+            try {
+                const res = await fetch(`${GS_URL}?action=getMeterRecords`).then(r => r.json());
+                container.innerHTML = res.reverse().map(b => `<div class="bg-white p-6 rounded-[2rem] border shadow-sm"><div class="flex justify-between mb-4"><div class="font-black text-xl">${b.roomName}</div><div class="text-emerald-600 font-black">$${b.tenantAmount}</div></div><div class="text-xs text-slate-400 space-y-1"><div>期間: ${b.period}</div><div>度數: ${b.previousKwh} → ${b.currentKwh} (用量: ${b.usedKwh})</div></div></div>`).join('');
+            } catch(e) { container.innerHTML = '無法載入紀錄'; }
+        }
+        // Asset Mock for first run if empty
+        function addNewLocation() {
+           const name = prompt('地點名稱');
+           if(name) {
+               const lid = 'L'+Date.now();
+               const rname = prompt('房號');
+               assets.push({ locationId: lid, locationName: name, address: '', roomId: 'R'+Date.now(), roomName: rname, lastKwh: 0, publicFee: 0 });
+               localStorage.setItem('tp_v6_assets', JSON.stringify(assets));
+               renderAssetList(); renderLocations();
+           }
+        }
+        async function pushAssets() {
+            await fetch(GS_URL, { method:'POST', mode:'no-cors', body: JSON.stringify({ action:'saveAssets', payload: assets }) });
+            alert('資產已推送到雲端');
+        }
+        initData();
     </script>
 </body>
 </html>
