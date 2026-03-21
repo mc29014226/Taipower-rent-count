@@ -55,7 +55,7 @@
           清空欄位
         </button>
         <button id="reloadBtn" class="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-xl">
-          從雲端載入
+          重新從雲端載入
         </button>
         <button id="syncBtn" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-xl">
           同步到雲端
@@ -428,7 +428,7 @@
         showStatus(`雲端載入失敗：${error.message}`, 'error');
       } finally {
         el.reloadBtn.disabled = false;
-        el.reloadBtn.textContent = '從雲端載入';
+        el.reloadBtn.textContent = '重新從雲端載入';
       }
   }
 
@@ -475,12 +475,13 @@
       el.locationFilter.addEventListener('change', renderList);
     }
 
-    function init() {
-      renderLocationFilter();
-      renderList();
-      bindEvents();
-      showStatus('已載入本機資料。', 'info');
-    }
+  async function init() {
+    bindEvents();
+    renderLocationFilter();
+    renderList();
+    showStatus('正在載入雲端資料...', 'info');
+    await loadFromCloud();
+  }
 
     init();
   </script>
