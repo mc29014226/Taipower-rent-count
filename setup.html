@@ -57,18 +57,26 @@
         </button>
       </div>
 
-      <div class="mt-6 border-t pt-6">
-        <div class="flex items-center justify-between mb-3">
-          <h2 class="text-lg font-bold">目前資料</h2>
-          <div class="text-sm text-slate-500">
-            共 <span id="countText">0</span> 筆
-          </div>
-        </div>
-        <div id="emptyText" class="text-slate-400 text-sm">目前沒有資料</div>
-        <div id="list" class="space-y-3"></div>
+     <div class="mt-6 border-t pt-6">
+  <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-3">
+    <div>
+      <h2 class="text-lg font-bold">目前資料</h2>
+      <div class="text-sm text-slate-500">
+        共 <span id="countText">0</span> 筆
       </div>
     </div>
+
+    <div class="w-full md:w-72">
+      <label class="block text-sm font-medium mb-1">依地點篩選</label>
+      <select id="locationFilter" class="border rounded-xl p-3 w-full bg-white">
+        <option value="">全部地點</option>
+      </select>
+    </div>
   </div>
+
+  <div id="emptyText" class="text-slate-400 text-sm">目前沒有資料</div>
+  <div id="list" class="space-y-3"></div>
+</div>
 
   <script>
     const GAS_URL = 'https://script.google.com/macros/s/AKfycbzW-Cv2scTGNwTv68xGhIpvYy5m0Hfn-bwWsLeRKdIRLnPuaooK8jRS4uiy6WTQnW4aXg/exec';
@@ -86,6 +94,7 @@
       list: document.getElementById('list'),
       emptyText: document.getElementById('emptyText'),
       countText: document.getElementById('countText'),
+      locationFilter: document.getElementById('locationFilter'),
       statusBar: document.getElementById('statusBar')
     };
 
@@ -136,42 +145,114 @@
       };
     }
 
+    function getUniqueLocations() {
+      return [...new Set(
+        data
+          .map(item => String(item.location || '').trim())
+          .filter(Boolean)
+      )].sort((a, b) => a.localeCompare(b, 'zh-Hant'));
+    }
+    
+    function renderLocationFilter() {
+      const currentValue = el.locationFilter.value;
+    
+      el.locationFilter.innerHTML = '<option value="">全部地點</option>';
+    
+      getUniqueLocations().forEach(location => {
+        const option = document.createElement('option');
+        option.value = location;
+        option.textContent = location;
+        el.locationFilter.appendChild(option);
+      });
+    
+      const stillExists = getUniqueLocations().includes(currentValue);
+      el.locationFilter.value = stillExists ? currentValue : '';
+    }
+
     function renderList() {
       el.list.innerHTML = '';
-      el.countText.textContent = data.length;
-
-      if (!data.length) {
+    
+      const filterLocation = String(el.locationFilter.value || '').trim();
+    
+      const filteredData = filterLocation
+        ? data.filter(item => String(item.location || '').trim() === filterLocation)
+        : data.slice();
+    
+      el.countText.textContent = filteredData.length;
+    
+      if (!filteredData.length) {
         el.emptyText.classList.remove('hidden');
         return;
       }
-
+    
       el.emptyText.classList.add('hidden');
-
-      data.forEach((item, index) => {
-        const card = document.createElement('div');
-        card.className = 'bg-slate-50 border rounded-2xl p-4';
-
-        card.innerHTML = `
-          <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
-            <div>
-              <div class="text-lg font-bold text-slate-900">${escapeHtml(item.location)} / ${escapeHtml(item.room)}</div>
-              <div class="text-sm text-slate-600 mt-1">上期度數：${Number(item.lastKwh)} 度</div>
-              <div class="text-sm text-slate-600">公電費：${Number(item.publicFee)} 元</div>
-            </div>
-            <div class="flex gap-2">
-              <button class="edit-btn bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-2 rounded-xl" data-index="${index}">修正</button>
-              <button class="delete-btn bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-xl" data-index="${index}">刪除</button>
-            </div>
-          </div>
-        `;
-
-        el.list.appendChild(card);
+    
+      const grouped = {};
+    
+      filteredData.forEach(item => {
+        const location = item.location || '未分類';
+        if (!grouped[location]) {
+          grouped[location] = [];
+        }
+    
+        const originalIndex = data.findIndex(row =>
+          row.location === item.location &&
+          row.room === item.room &&
+          Number(row.lastKwh) === Number(item.lastKwh) &&
+          Number(row.publicFee) === Number(item.publicFee)
+        );
+    
+        grouped[location].push({ ...item, _index: originalIndex });
       });
-
+    
+      Object.keys(grouped)
+        .sort((a, b) => a.localeCompare(b, 'zh-Hant'))
+        .forEach(location => {
+          const section = document.createElement('div');
+          section.className = 'mb-6';
+    
+          const header = document.createElement('div');
+          header.className = 'flex items-center justify-between mb-3 px-1';
+          header.innerHTML = `
+            <h3 class="text-xl font-bold text-slate-800">📍 ${escapeHtml(location)}</h3>
+            <span class="text-sm text-slate-500">共 ${grouped[location].length} 間</span>
+          `;
+          section.appendChild(header);
+    
+          const roomWrap = document.createElement('div');
+          roomWrap.className = 'space-y-3';
+    
+          grouped[location]
+            .sort((a, b) => String(a.room).localeCompare(String(b.room), 'zh-Hant', { numeric: true }))
+            .forEach(item => {
+              const card = document.createElement('div');
+              card.className = 'bg-slate-50 border rounded-2xl p-4';
+    
+              card.innerHTML = `
+                <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
+                  <div>
+                    <div class="text-lg font-bold text-slate-900">${escapeHtml(item.room)}</div>
+                    <div class="text-sm text-slate-600 mt-1">上期度數：${Number(item.lastKwh)} 度</div>
+                    <div class="text-sm text-slate-600">公電費：${Number(item.publicFee)} 元</div>
+                  </div>
+                  <div class="flex gap-2">
+                    <button class="edit-btn bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-2 rounded-xl" data-index="${item._index}">修正</button>
+                    <button class="delete-btn bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-xl" data-index="${item._index}">刪除</button>
+                  </div>
+                </div>
+              `;
+    
+              roomWrap.appendChild(card);
+            });
+    
+          section.appendChild(roomWrap);
+          el.list.appendChild(section);
+        });
+    
       document.querySelectorAll('.edit-btn').forEach(btn => {
         btn.addEventListener('click', () => editItem(Number(btn.dataset.index)));
       });
-
+    
       document.querySelectorAll('.delete-btn').forEach(btn => {
         btn.addEventListener('click', () => removeItem(Number(btn.dataset.index)));
       });
@@ -235,6 +316,7 @@
 
       saveLocal();
       clearForm();
+      renderLocationFilter();
       renderList();
     }
 
@@ -264,6 +346,7 @@
       saveLocal();
       clearForm();
       renderList();
+      renderLocationFilter();
       showStatus('資料已刪除。', 'success');
     }
 
@@ -278,6 +361,7 @@
         data = Array.isArray(result.data) ? result.data.map(normalizeItem) : [];
         saveLocal();
         clearForm();
+        renderLocationFilter();
         renderList();
         showStatus('已成功從雲端載入資料。', 'success');
       } catch (error) {
@@ -328,9 +412,11 @@
       });
       el.reloadBtn.addEventListener('click', loadFromCloud);
       el.syncBtn.addEventListener('click', syncToCloud);
+      el.locationFilter.addEventListener('change', renderList);
     }
 
     function init() {
+      renderLocationFilter();
       renderList();
       bindEvents();
       showStatus('已載入本機資料。', 'info');
