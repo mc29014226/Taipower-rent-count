@@ -1,65 +1,176 @@
-/**
- * Taipower Rent Count Backend v6.0
- * Sheets: assets, meter_records, latest_readings
- */
-const SPREADSHEET = SpreadsheetApp.getActiveSpreadsheet();
+function doGet(e){
+  const action = (e && e.parameter && e.parameter.action) ? e.parameter.action : "";
 
-function doGet(e) {
-  const action = e.parameter.action;
-  if (action === 'getAssets') return jsonRes(getData('assets'));
-  if (action === 'getLatestReadings') return jsonRes(getData('latest_readings'));
-  if (action === 'getMeterRecords') return jsonRes(getData('meter_records'));
-  return jsonRes({status:'error', msg:'Invalid action'});
+  if(action=="getAssets"){
+    return json({data: getSheet("assets")});
+  }
+
+  if(action=="getMeterRecords"){
+    return json({data: getSheet("meter_records")});
+  }
+
+  if(action=="getLatestReadings"){
+    return json({data: getSheet("latest_readings")});
+  }
+
+  return json([]);
 }
 
-function doPost(e) {
-  const data = JSON.parse(e.postData.contents);
-  const action = data.action;
-  if (action === 'saveAssets') return jsonRes(saveAssets(data.payload));
-  if (action === 'saveMeterRecord') return jsonRes(saveMeterRecord(data.payload));
-  return jsonRes({status:'error'});
+function doPost(e){
+  const body=JSON.parse(e.postData.contents);
+
+  if(body.action=="saveAssets"){
+    write("assets", body.payload);
+  }
+
+function doGet(e){
+  const action = (e && e.parameter && e.parameter.action) ? e.parameter.action : "";
+
+  if(action == "getAssets"){
+    return json({ data: getSheet("assets") });
+  }
+
+  if(action == "getMeterRecords"){
+    return json({ data: getSheet("meter_records") });
+  }
+
+  if(action == "getLatestReadings"){
+    return json({ data: getSheet("latest_readings") });
+  }
+
+  return json({ data: [] });
 }
 
-function getData(sheetName) {
-  const sheet = SPREADSHEET.getSheetByName(sheetName);
-  if (!sheet) return [];
-  const vals = sheet.getDataRange().getValues();
-  const keys = vals.shift();
-  return vals.map(row => {
-    let obj = {};
-    keys.forEach((k, i) => obj[k] = row[i]);
+function doPost(e){
+  const body = JSON.parse(e.postData.contents);
+
+  if(body.action == "saveAssets"){
+    overwriteSheet("assets", body.payload);
+  }
+
+  if(body.action == "saveMeterRecord"){
+    appendRowByHeaders("meter_records", body);
+    upsertLatestReading(body);
+  }
+
+  return json({ success: true });
+}
+
+function getSheet(name){
+  const sh = SpreadsheetApp.getActive().getSheetByName(name);
+  const values = sh.getDataRange().getValues();
+
+  if (!values || values.length === 0) return [];
+
+  const headers = values[0];
+  return values.slice(1).map(row => {
+    const obj = {};
+    headers.forEach((header, i) => {
+      obj[header] = row[i];
+    });
     return obj;
   });
 }
 
-function saveAssets(assets) {
-  const sheet = getOrCreateSheet('assets', ['locationId','locationName','address','roomId','roomName','lastKwh','publicFee','note','updatedAt']);
-  sheet.clearContents().appendRow(['locationId','locationName','address','roomId','roomName','lastKwh','publicFee','note','updatedAt']);
-  assets.forEach(a => sheet.appendRow([a.locationId, a.locationName, a.address, a.roomId, a.roomName, a.lastKwh, a.publicFee, a.note, new Date()]));
-  return {status:'ok'};
+function overwriteSheet(name, data){
+  const sh = SpreadsheetApp.getActive().getSheetByName(name);
+  const lastRow = sh.getLastRow();
+  const lastCol = sh.getLastColumn();
+
+  if (lastRow > 1) {
+    sh.getRange(2, 1, lastRow - 1, lastCol).clearContent();
+  }
+
+  if (!Array.isArray(data) || data.length === 0) return;
+
+  const headers = sh.getRange(1, 1, 1, lastCol).getValues()[0];
+  const rows = data.map(item => headers.map(h => item[h] ?? ""));
+  sh.getRange(2, 1, rows.length, headers.length).setValues(rows);
 }
 
-function saveMeterRecord(p) {
-  const mr = getOrCreateSheet('meter_records', ['timestamp','period','locationId','locationName','address','roomId','roomName','previousKwh','currentKwh','usedKwh','billTotal','billKwh','unitPrice','publicFee','tenantAmount','note']);
-  mr.appendRow([new Date(), p.period, p.locationId, p.locationName, p.address, p.roomId, p.roomName, p.previousKwh, p.currentKwh, p.usedKwh, p.billTotal, p.billKwh, p.unitPrice, p.publicFee, p.tenantAmount, p.note]);
-  
-  const lr = getOrCreateSheet('latest_readings', ['locationId','roomId','latestPeriod','latestKwh','updatedAt']);
-  const data = lr.getDataRange().getValues();
-  let found = false;
-  for(let i=1; i<data.length; i++) {
-    if(data[i][0] == p.locationId && data[i][1] == p.roomId) {
-      lr.getRange(i+1, 3, 1, 3).setValues([[p.period, p.currentKwh, new Date()]]);
-      found = true; break;
+function appendRowByHeaders(name, obj){
+  const sh = SpreadsheetApp.getActive().getSheetByName(name);
+  const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+  const row = headers.map(h => obj[h] ?? "");
+  sh.appendRow(row);
+}
+
+function upsertLatestReading(record){
+  const sh = SpreadsheetApp.getActive().getSheetByName("latest_readings");
+  const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+  const values = sh.getDataRange().getValues();
+
+  const locationIdx = headers.indexOf("location");
+  const roomIdx = headers.indexOf("room");
+
+  if (locationIdx === -1 || roomIdx === -1) {
+    throw new Error('latest_readings 缺少 location 或 room 欄位');
+  }
+
+  let targetRow = -1;
+  for (let i = 1; i < values.length; i++) {
+    if (
+      String(values[i][locationIdx]).trim() === String(record.location).trim() &&
+      String(values[i][roomIdx]).trim() === String(record.room).trim()
+    ) {
+      targetRow = i + 1;
+      break;
     }
   }
-  if(!found) lr.appendRow([p.locationId, p.roomId, p.period, p.currentKwh, new Date()]);
-  return {status:'ok'};
+
+  const latestObj = {
+    location: record.location,
+    room: record.room,
+    currentKwh: record.currentKwh,
+    lastKwh: record.currentKwh,
+    updatedAt: record.createdAt || new Date().toISOString()
+  };
+
+  const row = headers.map(h => latestObj[h] ?? "");
+
+  if (targetRow > 0) {
+    sh.getRange(targetRow, 1, 1, headers.length).setValues([row]);
+  } else {
+    sh.appendRow(row);
+  }
 }
 
-function getOrCreateSheet(name, headers) {
-  let s = SPREADSHEET.getSheetByName(name);
-  if(!s) { s = SPREADSHEET.insertSheet(name); s.appendRow(headers); }
-  return s;
+function json(o){
+  return ContentService
+    .createTextOutput(JSON.stringify(o))
+    .setMimeType(ContentService.MimeType.JSON);
 }
 
-function jsonRes(obj) { return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON); }
+  return json({ok:true});
+}
+
+function getSheet(name){
+  const sh = SpreadsheetApp.getActive().getSheetByName(name);
+  const values = sh.getDataRange().getValues();
+
+  if (!values || values.length === 0) return [];
+
+  const headers = values[0];
+  return values.slice(1).map(row => {
+    const obj = {};
+    headers.forEach((header, i) => {
+      obj[header] = row[i];
+    });
+    return obj;
+  });
+}
+
+function write(name, data){
+  const sh = SpreadsheetApp.getActive().getSheetByName(name);
+
+  if(Array.isArray(data)){
+    data.forEach(r => sh.appendRow(Object.values(r)));
+  } else {
+    sh.appendRow(Object.values(data));
+  }
+}
+
+function json(o){
+  return ContentService.createTextOutput(JSON.stringify(o))
+  .setMimeType(ContentService.MimeType.JSON);
+}
