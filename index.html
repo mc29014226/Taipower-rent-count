@@ -1,191 +1,474 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="zh-Hant">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>電費分攤系統</title>
-<script src="https://cdn.tailwindcss.com"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>台電租屋公平分攤</title>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
+<body class="bg-slate-100 text-slate-800 min-h-screen">
+  <div class="max-w-4xl mx-auto px-4 py-8">
+    <div class="bg-white rounded-2xl shadow-lg p-6 md:p-8">
+      <div class="mb-8">
+        <h1 class="text-2xl md:text-3xl font-bold text-slate-900">台電租屋公平分攤</h1>
+        <p class="text-slate-500 mt-2">依台電總帳單金額與總度數，自動計算各房租客應分攤金額。</p>
+      </div>
 
-<body class="bg-slate-100 p-4">
+      <div id="statusBar" class="mb-6 hidden rounded-xl px-4 py-3 text-sm font-medium"></div>
 
-<div class="max-w-xl mx-auto space-y-4">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium mb-2">地點</label>
+          <select id="locationSelect" class="w-full rounded-xl border border-slate-300 px-4 py-3 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
+            <option value="">請選擇地點</option>
+          </select>
+        </div>
 
-<h1 class="text-xl font-bold">電費分攤</h1>
+        <div>
+          <label class="block text-sm font-medium mb-2">房號</label>
+          <select id="roomSelect" class="w-full rounded-xl border border-slate-300 px-4 py-3 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500" disabled>
+            <option value="">請先選擇地點</option>
+          </select>
+        </div>
 
-<!-- 地點 -->
-<select id="selLoc" class="w-full p-3 rounded-xl border"></select>
+        <div>
+          <label class="block text-sm font-medium mb-2">上期度數</label>
+          <input id="previousKwh" type="number" min="0" step="1" class="w-full rounded-xl border border-slate-300 px-4 py-3 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-500" readonly />
+        </div>
 
-<!-- 房間 -->
-<select id="selRoom" class="w-full p-3 rounded-xl border"></select>
+        <div>
+          <label class="block text-sm font-medium mb-2">本期度數</label>
+          <input id="currentKwh" type="number" min="0" step="1" class="w-full rounded-xl border border-slate-300 px-4 py-3 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500" placeholder="請輸入本期電表度數" />
+        </div>
 
-<!-- 上期 -->
-<input id="valPrev" class="w-full p-3 rounded-xl border" placeholder="上期度數" readonly>
+        <div>
+          <label class="block text-sm font-medium mb-2">台電總金額</label>
+          <input id="billTotal" type="number" min="0" step="1" class="w-full rounded-xl border border-slate-300 px-4 py-3 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500" placeholder="例如 4200" />
+        </div>
 
-<!-- 本期 -->
-<input id="valCurr" type="number" class="w-full p-3 rounded-xl border" placeholder="本期度數">
+        <div>
+          <label class="block text-sm font-medium mb-2">台電總度數</label>
+          <input id="billKwh" type="number" min="1" step="1" class="w-full rounded-xl border border-slate-300 px-4 py-3 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500" placeholder="例如 850" />
+        </div>
 
-<!-- 台電 -->
-<input id="billT" type="number" class="w-full p-3 rounded-xl border" placeholder="台電總金額">
-<input id="billK" type="number" class="w-full p-3 rounded-xl border" placeholder="台電總度數">
+        <div>
+          <label class="block text-sm font-medium mb-2">公電費</label>
+          <input id="publicFee" type="number" min="0" step="1" class="w-full rounded-xl border border-slate-300 px-4 py-3 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500" placeholder="例如 100" />
+        </div>
 
-<!-- 計算 -->
-<button onclick="calc()" class="w-full bg-blue-500 text-white p-3 rounded-xl">
-計算
-</button>
+        <div>
+          <label class="block text-sm font-medium mb-2">備註</label>
+          <input id="remark" type="text" class="w-full rounded-xl border border-slate-300 px-4 py-3 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500" placeholder="可空白" />
+        </div>
+      </div>
 
-<!-- 結果 -->
-<div id="resBox" class="hidden bg-white p-4 rounded-xl border">
-<div>用電：<span id="resUsed"></span></div>
-<div>單價：<span id="resPrice"></span></div>
-<div class="font-bold text-lg">金額：$<span id="resTotal"></span></div>
-</div>
+      <div class="mt-6 flex flex-wrap gap-3">
+        <button id="calculateBtn" class="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-3 font-medium">
+          計算分攤
+        </button>
+        <button id="syncBtn" class="rounded-xl bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 font-medium">
+          同步抄表紀錄
+        </button>
+        <button id="reloadBtn" class="rounded-xl bg-slate-700 hover:bg-slate-800 text-white px-5 py-3 font-medium">
+          重新載入資料
+        </button>
+      </div>
 
-<!-- 同步 -->
-<button onclick="submitRecord()" class="w-full bg-green-500 text-white p-3 rounded-xl">
-同步到雲端
-</button>
+      <div id="resultCard" class="mt-8 hidden rounded-2xl border border-emerald-200 bg-emerald-50 p-6">
+        <h2 class="text-xl font-bold text-emerald-900 mb-4">計算結果</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm md:text-base">
+          <div class="bg-white rounded-xl p-4 border border-emerald-100">
+            <div class="text-slate-500">本期使用度數</div>
+            <div id="usedKwhText" class="text-2xl font-bold text-slate-900 mt-1">0 度</div>
+          </div>
+          <div class="bg-white rounded-xl p-4 border border-emerald-100">
+            <div class="text-slate-500">每度單價</div>
+            <div id="unitPriceText" class="text-2xl font-bold text-slate-900 mt-1">0 元</div>
+          </div>
+          <div class="bg-white rounded-xl p-4 border border-emerald-100">
+            <div class="text-slate-500">用電金額</div>
+            <div id="usageAmountText" class="text-2xl font-bold text-slate-900 mt-1">0 元</div>
+          </div>
+          <div class="bg-white rounded-xl p-4 border border-emerald-100">
+            <div class="text-slate-500">租客應繳總額</div>
+            <div id="tenantAmountText" class="text-2xl font-bold text-emerald-700 mt-1">0 元</div>
+          </div>
+        </div>
 
-</div>
+        <div class="mt-4 text-sm text-slate-600 leading-7">
+          <div>計算公式：<span class="font-medium">（台電總金額 ÷ 台電總度數）× 房間用電度數 + 公電費</span></div>
+          <div id="formulaDetail" class="mt-2"></div>
+        </div>
+      </div>
+    </div>
+  </div>
 
-<script>
-const GS_URL = "https://script.google.com/macros/s/AKfycbzW-Cv2scTGNwTv68xGhIpvYy5m0Hfn-bwWsLeRKdIRLnPuaooK8jRS4uiy6WTQnW4aXg/exec";
+  <script>
+    const GAS_URL = '你的 GAS Web App URL';
 
-let assets = [];
-let latest = [];
-
-// ===== 初始化 =====
-async function init() {
-    try {
-        const [a, l] = await Promise.all([
-            fetch(GS_URL + "?action=getAssets").then(r=>r.json()),
-            fetch(GS_URL + "?action=getLatestReadings").then(r=>r.json())
-        ]);
-
-        assets = Array.isArray(a) ? a : [];
-        latest = Array.isArray(l) ? l : [];
-
-        localStorage.setItem("backup_assets", JSON.stringify(assets));
-
-    } catch {
-        assets = JSON.parse(localStorage.getItem("backup_assets") || "[]");
-    }
-
-    renderLocations();
-}
-
-// ===== 地點 =====
-function renderLocations() {
-    const sel = document.getElementById("selLoc");
-
-    const map = {};
-    assets.forEach(a=>{
-        map[a.locationId] = a.locationName;
-    });
-
-    sel.innerHTML = Object.entries(map)
-        .map(([id,name])=>`<option value="${id}">${name}</option>`)
-        .join("");
-
-    renderRooms();
-}
-
-// ===== 房間 =====
-function renderRooms() {
-    const loc = document.getElementById("selLoc").value;
-    const sel = document.getElementById("selRoom");
-
-    const rooms = assets.filter(a=>a.locationId===loc);
-
-    sel.innerHTML = rooms
-        .map(r=>`<option value="${r.roomId}">${r.roomName}</option>`)
-        .join("");
-
-    loadPrev();
-}
-
-// ===== 上期度數 =====
-function loadPrev() {
-    const loc = selLoc.value;
-    const room = selRoom.value;
-
-    const cloud = latest.find(r=>r.locationId==loc && r.roomId==room);
-    const asset = assets.find(r=>r.locationId==loc && r.roomId==room);
-
-    document.getElementById("valPrev").value =
-        cloud ? cloud.latestKwh : (asset?.lastKwh || 0);
-}
-
-// ===== 計算 =====
-function calc() {
-    const loc = selLoc.value;
-    const room = selRoom.value;
-
-    const asset = assets.find(r=>r.locationId==loc && r.roomId==room);
-
-    const prev = Number(valPrev.value);
-    const curr = Number(valCurr.value);
-    const billT = Number(billT_input());
-    const billK = Number(billK_input());
-
-    const used = curr - prev;
-
-    if(used<0 || billK<=0) return;
-
-    const unit = billT / billK;
-    const total = Math.round(used * unit + (asset?.publicFee || 0));
-
-    resUsed.innerText = used;
-    resPrice.innerText = unit.toFixed(3);
-    resTotal.innerText = total;
-
-    resBox.classList.remove("hidden");
-}
-
-function billT_input(){return document.getElementById("billT").value}
-function billK_input(){return document.getElementById("billK").value}
-
-// ===== 同步 =====
-async function submitRecord() {
-
-    const loc = selLoc.value;
-    const room = selRoom.value;
-    const asset = assets.find(r=>r.locationId==loc && r.roomId==room);
-
-    const payload = {
-        action:"saveMeterRecord",
-        payload:{
-            timestamp:new Date().toISOString(),
-            locationId:asset.locationId,
-            locationName:asset.locationName,
-            roomId:asset.roomId,
-            roomName:asset.roomName,
-            previousKwh:Number(valPrev.value),
-            currentKwh:Number(valCurr.value),
-            usedKwh:Number(resUsed.innerText),
-            billTotal:Number(billT_input()),
-            billKwh:Number(billK_input()),
-            unitPrice:Number(resPrice.innerText),
-            publicFee:Number(asset.publicFee||0),
-            tenantAmount:Number(resTotal.innerText)
-        }
+    const STORAGE_KEYS = {
+      assets: 'assets',
+      latestReadings: 'latest_readings',
+      backupAssets: 'backup_assets'
     };
 
-    await fetch(GS_URL,{
-        method:"POST",
-        body:JSON.stringify(payload)
-    });
+    const state = {
+      assets: [],
+      latestReadings: [],
+      currentResult: null
+    };
 
-    alert("已同步");
+    const el = {
+      locationSelect: document.getElementById('locationSelect'),
+      roomSelect: document.getElementById('roomSelect'),
+      previousKwh: document.getElementById('previousKwh'),
+      currentKwh: document.getElementById('currentKwh'),
+      billTotal: document.getElementById('billTotal'),
+      billKwh: document.getElementById('billKwh'),
+      publicFee: document.getElementById('publicFee'),
+      remark: document.getElementById('remark'),
+      calculateBtn: document.getElementById('calculateBtn'),
+      syncBtn: document.getElementById('syncBtn'),
+      reloadBtn: document.getElementById('reloadBtn'),
+      resultCard: document.getElementById('resultCard'),
+      usedKwhText: document.getElementById('usedKwhText'),
+      unitPriceText: document.getElementById('unitPriceText'),
+      usageAmountText: document.getElementById('usageAmountText'),
+      tenantAmountText: document.getElementById('tenantAmountText'),
+      formulaDetail: document.getElementById('formulaDetail'),
+      statusBar: document.getElementById('statusBar')
+    };
+
+    function showStatus(message, type = 'info') {
+      el.statusBar.classList.remove('hidden', 'bg-blue-50', 'text-blue-700', 'bg-red-50', 'text-red-700', 'bg-emerald-50', 'text-emerald-700', 'bg-amber-50', 'text-amber-700');
+
+      if (type === 'success') {
+        el.statusBar.classList.add('bg-emerald-50', 'text-emerald-700');
+      } else if (type === 'error') {
+        el.statusBar.classList.add('bg-red-50', 'text-red-700');
+      } else if (type === 'warning') {
+        el.statusBar.classList.add('bg-amber-50', 'text-amber-700');
+      } else {
+        el.statusBar.classList.add('bg-blue-50', 'text-blue-700');
+      }
+
+      el.statusBar.textContent = message;
+    }
+
+    function saveLocalData() {
+      localStorage.setItem(STORAGE_KEYS.assets, JSON.stringify(state.assets));
+      localStorage.setItem(STORAGE_KEYS.latestReadings, JSON.stringify(state.latestReadings));
+      localStorage.setItem(STORAGE_KEYS.backupAssets, JSON.stringify(state.assets));
+    }
+
+    function loadLocalData() {
+      const assets = JSON.parse(localStorage.getItem(STORAGE_KEYS.assets) || localStorage.getItem(STORAGE_KEYS.backupAssets) || '[]');
+      const latestReadings = JSON.parse(localStorage.getItem(STORAGE_KEYS.latestReadings) || '[]');
+
+      state.assets = Array.isArray(assets) ? assets : [];
+      state.latestReadings = Array.isArray(latestReadings) ? latestReadings : [];
+    }
+
+    async function fetchJson(url) {
+      const response = await fetch(url, { method: 'GET' });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      return await response.json();
+    }
+
+    async function loadCloudData() {
+      if (!GAS_URL || GAS_URL === '你的 GAS Web App URL') {
+        loadLocalData();
+        showStatus('尚未設定 GAS_URL，目前使用本機資料。', 'warning');
+        renderLocations();
+        return;
+      }
+
+      try {
+        const [assetsRes, latestRes] = await Promise.all([
+          fetchJson(`${GAS_URL}?action=getAssets`),
+          fetchJson(`${GAS_URL}?action=getLatestReadings`)
+        ]);
+
+        const assets = Array.isArray(assetsRes.data) ? assetsRes.data : [];
+        const latestReadings = Array.isArray(latestRes.data) ? latestRes.data : [];
+
+        state.assets = assets;
+        state.latestReadings = latestReadings;
+        saveLocalData();
+
+        showStatus('已成功從雲端載入資料。', 'success');
+      } catch (error) {
+        loadLocalData();
+        showStatus(`雲端讀取失敗，已改用本機資料：${error.message}`, 'warning');
+      }
+
+      renderLocations();
+    }
+
+    function normalizeAsset(item) {
+      return {
+        location: String(item.location || '').trim(),
+        room: String(item.room || '').trim(),
+        lastKwh: Number(item.lastKwh || item.previousKwh || 0),
+        publicFee: Number(item.publicFee || 0)
+      };
+    }
+
+    function getNormalizedAssets() {
+      return state.assets.map(normalizeAsset).filter(item => item.location && item.room);
+    }
+
+    function getUniqueLocations() {
+      return [...new Set(getNormalizedAssets().map(item => item.location))];
+    }
+
+    function renderLocations() {
+      const locations = getUniqueLocations();
+
+      el.locationSelect.innerHTML = '<option value="">請選擇地點</option>';
+      locations.forEach(location => {
+        const option = document.createElement('option');
+        option.value = location;
+        option.textContent = location;
+        el.locationSelect.appendChild(option);
+      });
+
+      resetRoomSelect();
+      clearPreviousKwh();
+    }
+
+    function resetRoomSelect() {
+      el.roomSelect.innerHTML = '<option value="">請先選擇地點</option>';
+      el.roomSelect.disabled = true;
+    }
+
+    function clearPreviousKwh() {
+      el.previousKwh.value = '';
+    }
+
+    function renderRooms(location) {
+      const rooms = getNormalizedAssets()
+        .filter(item => item.location === location)
+        .map(item => item.room);
+
+      el.roomSelect.innerHTML = '<option value="">請選擇房號</option>';
+      rooms.forEach(room => {
+        const option = document.createElement('option');
+        option.value = room;
+        option.textContent = room;
+        el.roomSelect.appendChild(option);
+      });
+
+      el.roomSelect.disabled = false;
+      clearPreviousKwh();
+    }
+
+    function findAsset(location, room) {
+      return getNormalizedAssets().find(item => item.location === location && item.room === room) || null;
+    }
+
+    function findLatestReading(location, room) {
+      return state.latestReadings.find(item =>
+        String(item.location || '').trim() === location &&
+        String(item.room || '').trim() === room
+      ) || null;
+    }
+
+    function updatePreviousKwh() {
+      const location = el.locationSelect.value;
+      const room = el.roomSelect.value;
+
+      if (!location || !room) {
+        clearPreviousKwh();
+        return;
+      }
+
+      const latest = findLatestReading(location, room);
+      const asset = findAsset(location, room);
+
+      const previous = latest ? Number(latest.currentKwh || latest.lastKwh || 0) : Number(asset?.lastKwh || 0);
+      const publicFee = asset ? Number(asset.publicFee || 0) : 0;
+
+      el.previousKwh.value = previous;
+      if (!el.publicFee.value) {
+        el.publicFee.value = publicFee;
+      }
+    }
+
+    function calculate() {
+      const location = el.locationSelect.value;
+      const room = el.roomSelect.value;
+      const previousKwh = Number(el.previousKwh.value);
+      const currentKwh = Number(el.currentKwh.value);
+      const billTotal = Number(el.billTotal.value);
+      const billKwh = Number(el.billKwh.value);
+      const publicFee = Number(el.publicFee.value || 0);
+
+      if (!location) {
+        showStatus('請先選擇地點。', 'error');
+        return;
+      }
+      if (!room) {
+        showStatus('請先選擇房號。', 'error');
+        return;
+      }
+      if (!Number.isFinite(previousKwh) || previousKwh < 0) {
+        showStatus('上期度數資料異常。', 'error');
+        return;
+      }
+      if (!Number.isFinite(currentKwh) || currentKwh < 0) {
+        showStatus('請輸入正確的本期度數。', 'error');
+        return;
+      }
+      if (currentKwh < previousKwh) {
+        showStatus('本期度數不可小於上期度數。', 'error');
+        return;
+      }
+      if (!Number.isFinite(billTotal) || billTotal < 0) {
+        showStatus('請輸入正確的台電總金額。', 'error');
+        return;
+      }
+      if (!Number.isFinite(billKwh) || billKwh <= 0) {
+        showStatus('請輸入正確的台電總度數。', 'error');
+        return;
+      }
+      if (!Number.isFinite(publicFee) || publicFee < 0) {
+        showStatus('公電費不可為負數。', 'error');
+        return;
+      }
+
+      const usedKwh = currentKwh - previousKwh;
+      const unitPrice = billTotal / billKwh;
+      const usageAmount = usedKwh * unitPrice;
+      const tenantAmount = usageAmount + publicFee;
+
+      state.currentResult = {
+        location,
+        room,
+        previousKwh,
+        currentKwh,
+        usedKwh,
+        billTotal,
+        billKwh,
+        unitPrice,
+        publicFee,
+        usageAmount,
+        tenantAmount,
+        remark: el.remark.value.trim()
+      };
+
+      el.usedKwhText.textContent = `${usedKwh.toFixed(0)} 度`;
+      el.unitPriceText.textContent = `${unitPrice.toFixed(4)} 元`;
+      el.usageAmountText.textContent = `${Math.round(usageAmount)} 元`;
+      el.tenantAmountText.textContent = `${Math.round(tenantAmount)} 元`;
+      el.formulaDetail.textContent =
+        `(${billTotal} ÷ ${billKwh}) × ${usedKwh} + ${publicFee} = ${tenantAmount.toFixed(2)} 元`;
+
+      el.resultCard.classList.remove('hidden');
+      showStatus('計算完成。', 'success');
+    }
+
+    async function syncMeterRecord() {
+      if (!state.currentResult) {
+        showStatus('請先完成計算，再進行同步。', 'error');
+        return;
+      }
+
+      if (!GAS_URL || GAS_URL === '你的 GAS Web App URL') {
+        showStatus('尚未設定 GAS_URL，無法同步到雲端。', 'error');
+        return;
+      }
+
+      const payload = {
+        action: 'saveMeterRecord',
+        ...state.currentResult,
+        createdAt: new Date().toISOString()
+      };
+
+      try {
+        el.syncBtn.disabled = true;
+        el.syncBtn.textContent = '同步中...';
+
+        const response = await fetch(GAS_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'text/plain;charset=utf-8'
+          },
+          body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+
+        let result = {};
+        try {
+          result = await response.json();
+        } catch {
+          result = { success: true };
+        }
+
+        if (result.success === false) {
+          throw new Error(result.message || '同步失敗');
+        }
+
+        const existingIndex = state.latestReadings.findIndex(item =>
+          String(item.location || '').trim() === state.currentResult.location &&
+          String(item.room || '').trim() === state.currentResult.room
+        );
+
+        const latestItem = {
+          location: state.currentResult.location,
+          room: state.currentResult.room,
+          currentKwh: state.currentResult.currentKwh,
+          lastKwh: state.currentResult.currentKwh,
+          updatedAt: new Date().toISOString()
+        };
+
+        if (existingIndex >= 0) {
+          state.latestReadings[existingIndex] = latestItem;
+        } else {
+          state.latestReadings.push(latestItem);
+        }
+
+        saveLocalData();
+        el.previousKwh.value = state.currentResult.currentKwh;
+        el.currentKwh.value = '';
+
+        showStatus('抄表紀錄已成功同步。', 'success');
+      } catch (error) {
+        showStatus(`同步失敗：${error.message}`, 'error');
+      } finally {
+        el.syncBtn.disabled = false;
+        el.syncBtn.textContent = '同步抄表紀錄';
+      }
+    }
+
+    function bindEvents() {
+      el.locationSelect.addEventListener('change', () => {
+        const location = el.locationSelect.value;
+        if (!location) {
+          resetRoomSelect();
+          clearPreviousKwh();
+          return;
+        }
+        renderRooms(location);
+      });
+
+      el.roomSelect.addEventListener('change', updatePreviousKwh);
+      el.calculateBtn.addEventListener('click', calculate);
+      el.syncBtn.addEventListener('click', syncMeterRecord);
+      el.reloadBtn.addEventListener('click', loadCloudData);
+    }
+
+    async function init() {
+      bindEvents();
+      await loadCloudData();
+    }
+
     init();
-}
-
-// ===== 事件 =====
-selLoc.onchange = renderRooms;
-selRoom.onchange = loadPrev;
-
-init();
-</script>
-
+  </script>
 </body>
 </html>
