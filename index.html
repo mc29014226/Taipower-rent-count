@@ -453,58 +453,64 @@
       });
     }
 
-    async function syncGroupRecords() {
-      if (!state.calculationResult || !state.calculationResult.items || !state.calculationResult.items.length) {
-        showStatus('請先完成整組分攤計算。', 'error');
-        return;
-      }
-
-      try {
-        el.syncBtn.disabled = true;
-        el.syncBtn.textContent = '同步中...';
-
-        for (const item of state.calculationResult.items) {
-          const payload = {
-            action: 'saveMeterRecord',
-            location: item.location,
-            room: item.room,
-            billGroup: item.billGroup,
-            previousKwh: item.previousKwh,
-            currentKwh: item.currentKwh,
-            usedKwh: item.usedKwh,
-            billTotal: state.calculationResult.billTotal,
-            publicFee: item.publicFee,
-            usageAmount: Math.round(item.usageAmount),
-            tenantAmount: Math.round(item.tenantAmount),
-            remark: state.calculationResult.remark,
-            createdAt: new Date().toISOString()
-          };
-
-          const response = await fetch(GAS_URL, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'text/plain;charset=utf-8'
-            },
-            body: JSON.stringify(payload)
-          });
-
-          const result = await response.json();
-          if (result.success === false) {
-            throw new Error(result.message || `同步房號 ${item.room} 失敗`);
-          }
-        }
-
-        showStatus('整組抄表紀錄已成功同步。', 'success');
-        await loadCloudData();
-        el.billGroupSelect.value = state.calculationResult.billGroup;
-        renderGroupRooms();
-      } catch (error) {
-        showStatus(`同步失敗：${error.message}`, 'error');
-      } finally {
-        el.syncBtn.disabled = false;
-        el.syncBtn.textContent = '同步整組抄表紀錄';
-      }
+  async function syncGroupRecords() {
+    if (!state.calculationResult || !state.calculationResult.items || !state.calculationResult.items.length) {
+      showStatus('請先完成整組分攤計算。', 'error');
+      return;
     }
+  
+    try {
+      el.syncBtn.disabled = true;
+      el.syncBtn.textContent = '同步中...';
+  
+      const currentLocation = state.calculationResult.location;
+      const currentBillGroup = state.calculationResult.billGroup;
+  
+      for (const item of state.calculationResult.items) {
+        const payload = {
+          action: 'saveMeterRecord',
+          location: item.location,
+          room: item.room,
+          billGroup: item.billGroup,
+          previousKwh: item.previousKwh,
+          currentKwh: item.currentKwh,
+          usedKwh: item.usedKwh,
+          billTotal: state.calculationResult.billTotal,
+          publicFee: item.publicFee,
+          usageAmount: Math.round(item.usageAmount),
+          tenantAmount: Math.round(item.tenantAmount),
+          remark: state.calculationResult.remark,
+          createdAt: new Date().toISOString()
+        };
+  
+        const response = await fetch(GAS_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'text/plain;charset=utf-8'
+          },
+          body: JSON.stringify(payload)
+        });
+  
+        const result = await response.json();
+        if (result.success === false) {
+          throw new Error(result.message || `同步房號 ${item.room} 失敗`);
+        }
+      }
+  
+      showStatus('整組抄表紀錄已成功同步。', 'success');
+      await loadCloudData();
+  
+      el.locationSelect.value = currentLocation;
+      renderBillGroups(currentLocation);
+      el.billGroupSelect.value = currentBillGroup;
+      renderGroupRooms();
+    } catch (error) {
+      showStatus(`同步失敗：${error.message}`, 'error');
+    } finally {
+      el.syncBtn.disabled = false;
+      el.syncBtn.textContent = '同步整組抄表紀錄';
+    }
+  }
 
     function bindEvents() {
       el.locationSelect.addEventListener('change', () => {
