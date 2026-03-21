@@ -88,6 +88,7 @@
   <script>
     const GAS_URL = 'https://script.google.com/macros/s/AKfycbzW-Cv2scTGNwTv68xGhIpvYy5m0Hfn-bwWsLeRKdIRLnPuaooK8jRS4uiy6WTQnW4aXg/exec';
     const STORAGE_KEY = 'assets';
+    let adminPassword = sessionStorage.getItem('adminPassword') || '';
 
     const el = {
       loc: document.getElementById('loc'),
@@ -109,6 +110,20 @@
     let data = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
     let latestReadings = [];
     let editIndex = -1;
+
+    function ensureAdminPassword() {
+      if (adminPassword) return true;
+    
+      const input = prompt('請輸入管理密碼');
+      if (!input) {
+        showStatus('未輸入管理密碼。', 'warning');
+        return false;
+      }
+    
+      adminPassword = input.trim();
+      sessionStorage.setItem('adminPassword', adminPassword);
+      return true;
+    }
 
     function showStatus(message, type = 'info') {
       el.statusBar.classList.remove(
@@ -434,6 +449,8 @@
 
     async function syncToCloud() {
       try {
+        if (!ensureAdminPassword()) return;
+        
         el.syncBtn.disabled = true;
         el.syncBtn.textContent = '同步中...';
 
@@ -444,6 +461,7 @@
           },
           body: JSON.stringify({
             action: 'saveAssets',
+            adminPassword,
             payload: data
           })
         });
