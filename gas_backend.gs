@@ -1,176 +1,244 @@
-function doGet(e){
+function doGet(e) {
   const action = (e && e.parameter && e.parameter.action) ? e.parameter.action : "";
 
-  if(action=="getAssets"){
-    return json({data: getSheet("assets")});
+  if (action === "getAssets") {
+    return json({ data: getSheetObjects("assets") });
   }
 
-  if(action=="getMeterRecords"){
-    return json({data: getSheet("meter_records")});
+  if (action === "getLatestReadings") {
+    return json({ data: getSheetObjects("latest_readings") });
   }
 
-  if(action=="getLatestReadings"){
-    return json({data: getSheet("latest_readings")});
-  }
-
-  return json([]);
-}
-
-function doPost(e){
-  const body=JSON.parse(e.postData.contents);
-
-  if(body.action=="saveAssets"){
-    write("assets", body.payload);
-  }
-
-function doGet(e){
-  const action = (e && e.parameter && e.parameter.action) ? e.parameter.action : "";
-
-  if(action == "getAssets"){
-    return json({ data: getSheet("assets") });
-  }
-
-  if(action == "getMeterRecords"){
-    return json({ data: getSheet("meter_records") });
-  }
-
-  if(action == "getLatestReadings"){
-    return json({ data: getSheet("latest_readings") });
+  if (action === "getMeterRecords") {
+    return json({ data: getSheetObjects("meter_records") });
   }
 
   return json({ data: [] });
 }
 
-function doPost(e){
-  const body = JSON.parse(e.postData.contents);
+function doPost(e) {
+  try {
+    if (!e || !e.postData || !e.postData.contents) {
+      return json({ success: false, message: "缺少 POST 內容" });
+    }
 
-  if(body.action == "saveAssets"){
-    overwriteSheet("assets", body.payload);
+    const body = JSON.parse(e.postData.contents || "{}");
+    const action = body.action || "";
+
+    if (action === "saveAssets") {
+      const payload = Array.isArray(body.payload) ? body.payload : [];
+      overwriteAssets(payload);
+      return json({ success: true, message: "assets 已更新" });
+    }
+
+    if (action === "saveMeterRecord") {
+      saveMeterRecord(body);
+      return json({ success: true, message: "抄表紀錄已更新" });
+    }
+
+    return json({ success: false, message: "未知的 action" });
+  } catch (err) {
+    return json({
+      success: false,
+      message: err && err.message ? err.message : String(err)
+    });
   }
-
-  if(body.action == "saveMeterRecord"){
-    appendRowByHeaders("meter_records", body);
-    upsertLatestReading(body);
-  }
-
-  return json({ success: true });
 }
 
-function getSheet(name){
-  const sh = SpreadsheetApp.getActive().getSheetByName(name);
+function getSheetObjects(sheetName) {
+  const sh = SpreadsheetApp.getActive().getSheetByName(sheetName);
+  if (!sh) {
+    throw new Error("找不到工作表：" + sheetName);
+  }
+
   const values = sh.getDataRange().getValues();
+  if (!values || values.length === 0) {
+    return [];
+  }
 
-  if (!values || values.length === 0) return [];
+  const headers = values[0].map(function(h) {
+    return String(h || "").trim();
+  });
 
-  const headers = values[0];
-  return values.slice(1).map(row => {
+  if (headers.every(function(h) { return h === ""; })) {
+    return [];
+  }
+
+  return values.slice(1).filter(function(row) {
+    return row.some(function(cell) {
+      return cell !== "" && cell !== null;
+    });
+  }).map(function(row) {
     const obj = {};
-    headers.forEach((header, i) => {
+    headers.forEach(function(header, i) {
       obj[header] = row[i];
     });
     return obj;
   });
 }
 
-function overwriteSheet(name, data){
-  const sh = SpreadsheetApp.getActive().getSheetByName(name);
+function overwriteAssets(payload) {
+  const sh = SpreadsheetApp.getActive().getSheetByName("assets");
+  if (!sh) {
+    throw new Error("找不到工作表：assets");
+  }
+
+  const headers = getHeaders(sh);
+  requireHeaders(headers, ["location", "room", "billGroup", "lastKwh", "publicFee"], "assets");
+
   const lastRow = sh.getLastRow();
   const lastCol = sh.getLastColumn();
 
-  if (lastRow > 1) {
+  if (lastRow > 1 && lastCol > 0) {
     sh.getRange(2, 1, lastRow - 1, lastCol).clearContent();
   }
 
-  if (!Array.isArray(data) || data.length === 0) return;
+  if (!payload.length) {
+    return;
+  }
 
-  const headers = sh.getRange(1, 1, 1, lastCol).getValues()[0];
-  const rows = data.map(item => headers.map(h => item[h] ?? ""));
+  const rows = payload.map(function(item) {
+    const normalized = {
+      location: safeString(item.location),
+      room: safeString(item.room),
+      billGroup: safeString(item.billGroup),
+      lastKwh: safeNumber(item.lastKwh),
+      publicFee: safeNumber(item.publicFee)
+    };
+
+    return headers.map(function(header) {
+      return normalized.hasOwnProperty(header) ? normalized[header] : "";
+    });
+  });
+
   sh.getRange(2, 1, rows.length, headers.length).setValues(rows);
 }
 
-function appendRowByHeaders(name, obj){
-  const sh = SpreadsheetApp.getActive().getSheetByName(name);
-  const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
-  const row = headers.map(h => obj[h] ?? "");
-  sh.appendRow(row);
+function saveMeterRecord(record) {
+  const normalized = {
+    location: safeString(record.location),
+    room: safeString(record.room),
+    billGroup: safeString(record.billGroup),
+    previousKwh: safeNumber(record.previousKwh),
+    currentKwh: safeNumber(record.currentKwh),
+    usedKwh: safeNumber(record.usedKwh),
+    billTotal: safeNumber(record.billTotal),
+    billKwh: safeNumber(record.billKwh),
+    unitPrice: safeNumber(record.unitPrice),
+    publicFee: safeNumber(record.publicFee),
+    usageAmount: safeNumber(record.usageAmount),
+    tenantAmount: safeNumber(record.tenantAmount),
+    remark: safeString(record.remark),
+    createdAt: safeString(record.createdAt) || new Date().toISOString()
+  };
+
+  if (!normalized.location) {
+    throw new Error("location 不可空白");
+  }
+  if (!normalized.room) {
+    throw new Error("room 不可空白");
+  }
+  if (!normalized.billGroup) {
+    throw new Error("billGroup 不可空白");
+  }
+
+  appendObjectByHeaders("meter_records", normalized);
+  upsertLatestReading(normalized);
 }
 
-function upsertLatestReading(record){
+function upsertLatestReading(record) {
   const sh = SpreadsheetApp.getActive().getSheetByName("latest_readings");
-  const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
-  const values = sh.getDataRange().getValues();
+  if (!sh) {
+    throw new Error("找不到工作表：latest_readings");
+  }
 
+  const headers = getHeaders(sh);
+  requireHeaders(headers, ["location", "room", "billGroup", "currentKwh", "lastKwh", "updatedAt"], "latest_readings");
+
+  const values = sh.getDataRange().getValues();
   const locationIdx = headers.indexOf("location");
   const roomIdx = headers.indexOf("room");
-
-  if (locationIdx === -1 || roomIdx === -1) {
-    throw new Error('latest_readings 缺少 location 或 room 欄位');
-  }
-
-  let targetRow = -1;
-  for (let i = 1; i < values.length; i++) {
-    if (
-      String(values[i][locationIdx]).trim() === String(record.location).trim() &&
-      String(values[i][roomIdx]).trim() === String(record.room).trim()
-    ) {
-      targetRow = i + 1;
-      break;
-    }
-  }
+  const billGroupIdx = headers.indexOf("billGroup");
 
   const latestObj = {
     location: record.location,
     room: record.room,
+    billGroup: record.billGroup,
     currentKwh: record.currentKwh,
     lastKwh: record.currentKwh,
     updatedAt: record.createdAt || new Date().toISOString()
   };
 
-  const row = headers.map(h => latestObj[h] ?? "");
+  const rowData = headers.map(function(header) {
+    return latestObj.hasOwnProperty(header) ? latestObj[header] : "";
+  });
+
+  let targetRow = -1;
+  for (let i = 1; i < values.length; i++) {
+    const rowLocation = String(values[i][locationIdx] || "").trim();
+    const rowRoom = String(values[i][roomIdx] || "").trim();
+
+    if (rowLocation === record.location && rowRoom === record.room && rowBillGroup === record.billGroup) {
+      targetRow = i + 1;
+      break;
+    }
+  }
 
   if (targetRow > 0) {
-    sh.getRange(targetRow, 1, 1, headers.length).setValues([row]);
+    sh.getRange(targetRow, 1, 1, headers.length).setValues([rowData]);
   } else {
-    sh.appendRow(row);
+    sh.appendRow(rowData);
   }
 }
 
-function json(o){
-  return ContentService
-    .createTextOutput(JSON.stringify(o))
-    .setMimeType(ContentService.MimeType.JSON);
+function appendObjectByHeaders(sheetName, obj) {
+  const sh = SpreadsheetApp.getActive().getSheetByName(sheetName);
+  if (!sh) {
+    throw new Error("找不到工作表：" + sheetName);
+  }
+
+  const headers = getHeaders(sh);
+  if (!headers.length) {
+    throw new Error(sheetName + " 缺少標題列");
+  }
+
+  const row = headers.map(function(header) {
+    return obj.hasOwnProperty(header) ? obj[header] : "";
+  });
+
+  sh.appendRow(row);
 }
 
-  return json({ok:true});
-}
+function getHeaders(sh) {
+  const lastCol = sh.getLastColumn();
+  if (lastCol === 0) {
+    return [];
+  }
 
-function getSheet(name){
-  const sh = SpreadsheetApp.getActive().getSheetByName(name);
-  const values = sh.getDataRange().getValues();
-
-  if (!values || values.length === 0) return [];
-
-  const headers = values[0];
-  return values.slice(1).map(row => {
-    const obj = {};
-    headers.forEach((header, i) => {
-      obj[header] = row[i];
-    });
-    return obj;
+  return sh.getRange(1, 1, 1, lastCol).getValues()[0].map(function(h) {
+    return String(h || "").trim();
   });
 }
 
-function write(name, data){
-  const sh = SpreadsheetApp.getActive().getSheetByName(name);
-
-  if(Array.isArray(data)){
-    data.forEach(r => sh.appendRow(Object.values(r)));
-  } else {
-    sh.appendRow(Object.values(data));
-  }
+function requireHeaders(headers, requiredHeaders, sheetName) {
+  requiredHeaders.forEach(function(header) {
+    if (headers.indexOf(header) === -1) {
+      throw new Error(sheetName + " 缺少欄位：" + header);
+    }
+  });
 }
 
-function json(o){
-  return ContentService.createTextOutput(JSON.stringify(o))
-  .setMimeType(ContentService.MimeType.JSON);
+function safeString(value) {
+  return String(value == null ? "" : value).trim();
+}
+
+function safeNumber(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function json(obj) {
+  return ContentService
+    .createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
 }
