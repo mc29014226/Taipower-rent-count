@@ -19,7 +19,7 @@
 
       <div id="statusBar" class="hidden rounded-xl px-4 py-3 text-sm font-medium mb-6"></div>
 
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div class="grid grid-cols-1 md:grid-cols-6 gap-4">
         <div>
           <label class="block text-sm font-medium mb-2">地點</label>
           <select id="locationFilter" class="w-full rounded-xl border border-slate-300 px-4 py-3 bg-white">
@@ -36,11 +36,35 @@
 
         <div>
           <label class="block text-sm font-medium mb-2">帳單群組</label>
-          <select id="billGroupFilter" class="w-full rounded-xl border border-slate-300 px-4 py-3 bg-white">
-            <option value="">全部群組</option>
+          <input id="billGroupDisplay" type="text" class="w-full rounded-xl border border-slate-300 px-4 py-3 bg-slate-100" placeholder="自動帶入" readonly>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium mb-2">年份</label>
+          <select id="yearFilter" class="w-full rounded-xl border border-slate-300 px-4 py-3 bg-white">
+            <option value="">全部年份</option>
           </select>
         </div>
 
+        <div>
+          <label class="block text-sm font-medium mb-2">月份</label>
+          <select id="monthFilter" class="w-full rounded-xl border border-slate-300 px-4 py-3 bg-white">
+            <option value="">全部月份</option>
+            <option value="1">1 月</option>
+            <option value="2">2 月</option>
+            <option value="3">3 月</option>
+            <option value="4">4 月</option>
+            <option value="5">5 月</option>
+            <option value="6">6 月</option>
+            <option value="7">7 月</option>
+            <option value="8">8 月</option>
+            <option value="9">9 月</option>
+            <option value="10">10 月</option>
+            <option value="11">11 月</option>
+            <option value="12">12 月</option>
+          </select>
+        </div>
+        
         <div>
           <label class="block text-sm font-medium mb-2">關鍵字</label>
           <input id="keywordFilter" type="text" class="w-full rounded-xl border border-slate-300 px-4 py-3 bg-white" placeholder="搜尋備註、房號、地點">
@@ -78,7 +102,9 @@
     const el = {
       locationFilter: document.getElementById('locationFilter'),
       roomFilter: document.getElementById('roomFilter'),
-      billGroupFilter: document.getElementById('billGroupFilter'),
+      billGroupDisplay: document.getElementById('billGroupDisplay'),
+      yearFilter: document.getElementById('yearFilter'),
+      monthFilter: document.getElementById('monthFilter'),
       keywordFilter: document.getElementById('keywordFilter'),
       reloadBtn: document.getElementById('reloadBtn'),
       clearFilterBtn: document.getElementById('clearFilterBtn'),
@@ -151,11 +177,14 @@
         .replaceAll("'", '&#039;');
     }
 
-    function formatDateTime(value) {
-      if (!value) return '-';
-
+    function parseDate(value) {
       const date = new Date(value);
-      if (Number.isNaN(date.getTime())) return value;
+      return Number.isNaN(date.getTime()) ? null : date;
+    }
+
+    function formatDateTime(value) {
+      const date = parseDate(value);
+      if (!date) return value || '-';
 
       const yyyy = date.getFullYear();
       const mm = String(date.getMonth() + 1).padStart(2, '0');
@@ -183,10 +212,21 @@
       )].sort((a, b) => a.localeCompare(b, 'zh-Hant', { numeric: true }));
     }
 
+    function getUniqueYears() {
+      return [...new Set(
+        state.meterRecords
+          .map(item => {
+            const d = parseDate(item.createdAt);
+            return d ? String(d.getFullYear()) : '';
+          })
+          .filter(Boolean)
+      )].sort((a, b) => Number(b) - Number(a));
+    }
+
     function renderFilters() {
       const currentLocation = el.locationFilter.value;
       const currentRoom = el.roomFilter.value;
-      const currentBillGroup = el.billGroupFilter.value;
+      const currentYear = el.yearFilter.value;
 
       el.locationFilter.innerHTML = '<option value="">全部地點</option>';
       getUniqueValues('location').forEach(value => {
@@ -204,12 +244,12 @@
         el.roomFilter.appendChild(option);
       });
 
-      el.billGroupFilter.innerHTML = '<option value="">全部群組</option>';
-      getUniqueValues('billGroup').forEach(value => {
+      el.yearFilter.innerHTML = '<option value="">全部年份</option>';
+      getUniqueYears().forEach(value => {
         const option = document.createElement('option');
         option.value = value;
         option.textContent = value;
-        el.billGroupFilter.appendChild(option);
+        el.yearFilter.appendChild(option);
       });
 
       if (getUniqueValues('location').includes(currentLocation)) {
@@ -218,35 +258,66 @@
       if (getUniqueValues('room').includes(currentRoom)) {
         el.roomFilter.value = currentRoom;
       }
-      if (getUniqueValues('billGroup').includes(currentBillGroup)) {
-        el.billGroupFilter.value = currentBillGroup;
+      if (getUniqueYears().includes(currentYear)) {
+        el.yearFilter.value = currentYear;
       }
     }
 
-    function getFilteredRecords() {
+    function updateBillGroupDisplay() {
       const location = String(el.locationFilter.value || '').trim();
       const room = String(el.roomFilter.value || '').trim();
-      const billGroup = String(el.billGroupFilter.value || '').trim();
-      const keyword = String(el.keywordFilter.value || '').trim().toLowerCase();
 
+      if (!location || !room) {
+        el.billGroupDisplay.value = '';
+        return;
+      }
+
+      const matched = sortRecords(state.meterRecords).find(item =>
+        item.location === location && item.room === room
+      );
+
+      el.billGroupDisplay.value = matched ? matched.billGroup : '';
+    }
+
+     function getFilteredRecords() {
+      const location = String(el.locationFilter.value || '').trim();
+      const room = String(el.roomFilter.value || '').trim();
+      const billGroup = String(el.billGroupDisplay.value || '').trim();
+      const year = String(el.yearFilter.value || '').trim();
+      const month = String(el.monthFilter.value || '').trim();
+      const keyword = String(el.keywordFilter.value || '').trim().toLowerCase();
+    
       return sortRecords(state.meterRecords).filter(item => {
         const matchLocation = !location || item.location === location;
         const matchRoom = !room || item.room === room;
         const matchBillGroup = !billGroup || item.billGroup === billGroup;
-
-        const targetText = [
+    
+        const d = parseDate(item.createdAt);
+        const itemYear = d ? String(d.getFullYear()) : '';
+        const itemMonth = d ? String(d.getMonth() + 1) : '';
+    
+        const matchYear = !year || itemYear === year;
+        const matchMonth = !month || itemMonth === month;
+    
+        const keywordTarget = [
           item.location,
           item.room,
           item.billGroup,
           item.remark,
-          formatDateTime(item.createdAt)
+          formatDateTime(item.createdAt),
+          String(item.previousKwh),
+          String(item.currentKwh),
+          String(item.usedKwh),
+          String(item.billTotal),
+          String(item.usageAmount),
+          String(item.tenantAmount)
         ].join(' ').toLowerCase();
-
-        const matchKeyword = !keyword || targetText.includes(keyword);
-
-        return matchLocation && matchRoom && matchBillGroup && matchKeyword;
+    
+        const matchKeyword = !keyword || keywordTarget.includes(keyword);
+    
+        return matchLocation && matchRoom && matchBillGroup && matchYear && matchMonth && matchKeyword;
       });
-    }
+     }
 
     function renderList() {
       const records = getFilteredRecords();
@@ -297,14 +368,10 @@
               <div class="font-bold mt-1">${Math.round(item.billTotal)} 元</div>
             </div>
             <div class="bg-white rounded-xl border p-3">
-              <div class="text-slate-500">公電費</div>
-              <div class="font-bold mt-1">${Math.round(item.publicFee)} 元</div>
-            </div>
-            <div class="bg-white rounded-xl border p-3">
               <div class="text-slate-500">用電分攤金額</div>
               <div class="font-bold mt-1">${Math.round(item.usageAmount)} 元</div>
             </div>
-            <div class="bg-white rounded-xl border p-3 md:col-span-2">
+            <div class="bg-white rounded-xl border p-3 md:col-span-3">
               <div class="text-slate-500">備註</div>
               <div class="font-bold mt-1 break-words">${escapeHtml(item.remark || '-')}</div>
             </div>
@@ -324,6 +391,7 @@
         state.meterRecords = Array.isArray(result.data) ? result.data.map(normalizeRecord) : [];
 
         renderFilters();
+        updateBillGroupDisplay();
         renderList();
         showStatus('已成功載入歷史帳單資料。', 'success');
       } catch (error) {
@@ -337,18 +405,32 @@
     function clearFilters() {
       el.locationFilter.value = '';
       el.roomFilter.value = '';
-      el.billGroupFilter.value = '';
+      el.billGroupDisplay.value = '';
+      el.yearFilter.value = '';
+      el.monthFilter.value = '';
       el.keywordFilter.value = '';
+      
       renderList();
       showStatus('已清除篩選條件。', 'info');
+    }
+
+    function handleLocationChange() {
+      updateBillGroupDisplay();
+      renderList();
+    }
+
+    function handleRoomChange() {
+      updateBillGroupDisplay();
+      renderList();
     }
 
     function bindEvents() {
       el.reloadBtn.addEventListener('click', loadRecords);
       el.clearFilterBtn.addEventListener('click', clearFilters);
-      el.locationFilter.addEventListener('change', renderList);
-      el.roomFilter.addEventListener('change', renderList);
-      el.billGroupFilter.addEventListener('change', renderList);
+      el.locationFilter.addEventListener('change', handleLocationChange);
+      el.roomFilter.addEventListener('change', handleRoomChange);
+      el.yearFilter.addEventListener('change', renderList);
+      el.monthFilter.addEventListener('change', renderList);
       el.keywordFilter.addEventListener('input', renderList);
     }
 
