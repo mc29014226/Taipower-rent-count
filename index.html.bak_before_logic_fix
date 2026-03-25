@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>台電租屋分攤 (單價累進版)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen">
+  <div class="max-w-6xl mx-auto px-4 py-8">
+    <div class="bg-white rounded-2xl shadow-lg p-6 md:p-8">
+      <div class="mb-8">
+        <h1 class="text-2xl font-bold text-slate-900">台電租屋分攤 - 單價累進模式</h1>
+        <p class="text-slate-500 mt-2">系統將自動尋找最接近帳單總額的電費單價。</p>
+      </div>
+
+      <div id="statusBar" class="mb-6 hidden rounded-xl px-4 py-3 text-sm font-medium"></div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div>
+          <label class="block text-sm font-medium mb-2">地點</label>
+          <select id="locationSelect" class="w-full rounded-xl border border-slate-300 px-4 py-3 bg-white"><option value="">請選擇地點</option></select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-2">帳單群組</label>
+          <select id="billGroupSelect" class="w-full rounded-xl border border-slate-300 px-4 py-3 bg-white" disabled><option value="">請先選擇地點</option></select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-2">台電帳單金額</label>
+          <input id="billTotal" type="number" class="w-full rounded-xl border border-slate-300 px-4 py-3 bg-white" placeholder="例如 4200" />
+        </div>
+      </div>
+
+      <div class="mt-6 flex flex-wrap gap-3">
+        <button id="calculateBtn" class="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 font-bold">自動計算單價與分攤</button>
+        <button id="copyLineBtn" class="hidden rounded-xl bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 font-bold">複製 LINE 帳單</button>
+      </div>
+
+      <div class="mt-8 border-t pt-6">
+        <div id="groupTableWrap" class="hidden overflow-x-auto">
+          <table class="min-w-full border border-slate-200">
+            <thead class="bg-slate-50"><tr><th class="px-4 py-3 text-left">房號</th><th class="px-4 py-3 text-left">度數</th><th class="px-4 py-3 text-left">公電費</th><th class="px-4 py-3 text-left">房電費</th><th class="px-4 py-3 text-left">應繳總計</th></tr></thead>
+            <tbody id="groupTableBody" class="bg-white divide-y"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="summaryCard" class="mt-8 hidden rounded-2xl border border-blue-200 bg-blue-50 p-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div class="bg-white p-4 rounded-xl border"> <div class="text-sm text-gray-500">建議單價</div> <div id="priceResult" class="text-2xl font-bold text-blue-700">0 元/度</div> </div>
+          <div class="bg-white p-4 rounded-xl border"> <div class="text-sm text-gray-500">應收合計</div> <div id="totalCollected" class="text-2xl font-bold">0 元</div> </div>
+          <div class="bg-white p-4 rounded-xl border"> <div class="text-sm text-gray-500">盈虧情況</div> <div id="balanceText" class="text-2xl font-bold">0 元</div> </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const GAS_URL = 'https://script.google.com/macros/s/AKfycbzW-Cv2scTGNwTv68xGhIpvYy5m0Hfn-bwWsLeRKdIRLnPuaooK8jRS4uiy6WTQnW4aXg/exec';
+    const state = { assets: [], latestReadings: [], selectedGroupRooms: [], finalPrice: 0 };
+    const el = { locationSelect: document.getElementById('locationSelect'), billGroupSelect: document.getElementById('billGroupSelect'), billTotal: document.getElementById('billTotal'), calculateBtn: document.getElementById('calculateBtn'), groupTableWrap: document.getElementById('groupTableWrap'), groupTableBody: document.getElementById('groupTableBody'), summaryCard: document.getElementById('summaryCard'), priceResult: document.getElementById('priceResult'), totalCollected: document.getElementById('totalCollected'), balanceText: document.getElementById('balanceText'), copyLineBtn: document.getElementById('copyLineBtn') };
+
+    async function loadCloudData() {
+      const [a, l] = await Promise.all([fetch(`${GAS_URL}?action=getAssets`).then(r => r.json()), fetch(`${GAS_URL}?action=getLatestReadings`).then(r => r.json())]);
+      state.assets = a.data; state.latestReadings = l.data;
+      const locs = [...new Set(state.assets.map(i => i.location))].sort();
+      el.locationSelect.innerHTML = '<option value="">請選擇地點</option>' + locs.map(l => `<option value="${l}">${l}</option>`).join('');
+    }
+
+    el.locationSelect.addEventListener('change', () => {
+      const gs = [...new Set(state.assets.filter(i => i.location === el.locationSelect.value).map(i => i.billGroup))].sort();
+      el.billGroupSelect.innerHTML = '<option value="">請選擇群組</option>' + gs.map(g => `<option value="${g}">${g}</option>`).join('');
+      el.billGroupSelect.disabled = false;
+    });
+
+    el.billGroupSelect.addEventListener('change', () => {
+      state.selectedGroupRooms = state.assets.filter(i => i.location === el.locationSelect.value && i.billGroup === el.billGroupSelect.value).map(i => ({
+        ...i, lastKwh: (state.latestReadings.find(r => r.room === i.room) || i).lastKwh, currentKwh: '', usedKwh: 0
+      }));
+      el.groupTableBody.innerHTML = state.selectedGroupRooms.map((r, idx) => `<tr><td class="px-4 py-3">${r.room}</td><td class="px-4 py-3">${r.lastKwh} -> <input type="number" class="kwh-input w-24 border rounded px-1" data-idx="${idx}"></td><td class="px-4 py-3">${r.publicFee}</td><td class="room-fee px-4 py-3">0</td><td class="total-fee px-4 py-3 font-bold">0</td></tr>`).join('');
+      el.groupTableWrap.classList.remove('hidden');
+      document.querySelectorAll('.kwh-input').forEach(input => input.addEventListener('input', e => {
+        const idx = e.target.dataset.idx; state.selectedGroupRooms[idx].currentKwh = Number(e.target.value);
+        state.selectedGroupRooms[idx].usedKwh = Math.max(0, state.selectedGroupRooms[idx].currentKwh - state.selectedGroupRooms[idx].lastKwh);
+      }));
+    });
+
+    function calculate() {
+      const target = Number(el.billTotal.value);
+      if (!target) return alert('請輸入帳單金額');
+      let price = 0.1;
+      let totalColl = 0;
+      const rooms = state.selectedGroupRooms;
+      while (true) {
+        totalColl = rooms.reduce((sum, r) => sum + Math.round(r.usedKwh * price) + r.publicFee, 0);
+        if (totalColl >= target || price > 10) break;
+        price = Number((price + 0.1).toFixed(1));
+      }
+      state.finalPrice = price;
+      rooms.forEach((r, i) => {
+        const row = el.groupTableBody.querySelectorAll('tr')[i];
+        const roomFee = Math.round(r.usedKwh * price);
+        r.finalTotal = roomFee + r.publicFee;
+        row.querySelector('.room-fee').textContent = roomFee;
+        row.querySelector('.total-fee').textContent = r.finalTotal;
+      });
+      el.priceResult.textContent = price + ' 元/度';
+      el.totalCollected.textContent = totalColl + ' 元';
+      const diff = totalColl - target;
+      el.balanceText.textContent = (diff >= 0 ? '+' : '') + diff + ' 元';
+      el.summaryCard.classList.remove('hidden'); el.copyLineBtn.classList.remove('hidden');
+    }
+
+    el.copyLineBtn.addEventListener('click', () => {
+      let txt = `⚡️ 電費通知\n📍 ${el.locationSelect.value} - ${el.billGroupSelect.value}\n💰 採用單價：${state.finalPrice} 元/度\n---\n`;
+      state.selectedGroupRooms.forEach(r => txt += `${r.room}房：$${r.finalTotal} (${r.usedKwh}度)\n`);
+      txt += `---\n總收：$${el.totalCollected.textContent} (帳單:$${el.billTotal.value})`;
+      navigator.clipboard.writeText(txt).then(() => alert('LINE 帳單已複製！'));
+    });
+
+    el.calculateBtn.addEventListener('click', calculate);
+    window.addEventListener('DOMContentLoaded', loadCloudData);
+  </script>
+</body>
+</html>
