@@ -327,56 +327,35 @@
       const location = el.locationSelect.value;
       const billGroup = el.billGroupSelect.value;
       const billTotal = Number(el.billTotal.value);
-
-      if (!location) {
-        showStatus('請先選擇地點。', 'error');
+    
+      const errorMessage = validateCalculationInput({
+        location,
+        billGroup,
+        billTotal,
+        rooms: state.selectedGroupRooms
+      });
+    
+      if (errorMessage) {
+        showStatus(errorMessage, 'error');
         return;
       }
-
-      if (!billGroup) {
-        showStatus('請先選擇帳單群組。', 'error');
-        return;
-      }
-
-      if (!state.selectedGroupRooms.length) {
-        showStatus('目前沒有可計算的房間資料。', 'error');
-        return;
-      }
-
-      if (!Number.isFinite(billTotal) || billTotal < 0) {
-        showStatus('請輸入正確的台電總金額。', 'error');
-        return;
-      }
-
-      for (const item of state.selectedGroupRooms) {
-        if (item.currentKwh === '') {
-          showStatus(`請輸入房號 ${item.room} 的本期度數。`, 'error');
-          return;
-        }
-        if (Number(item.currentKwh) < Number(item.previousKwh)) {
-          showStatus(`房號 ${item.room} 的本期度數不可小於上期度數。`, 'error');
-          return;
-        }
-      }
-
-      const groupTotalUsed = state.selectedGroupRooms.reduce((sum, item) => sum + Number(item.usedKwh || 0), 0);
-
-      if (groupTotalUsed <= 0) {
-        showStatus('本組總用電必須大於 0。', 'error');
-        return;
-      }
-
+    
+      const groupTotalUsed = state.selectedGroupRooms.reduce(
+        (sum, item) => sum + Number(item.usedKwh || 0),
+        0
+      );
+    
       const result = calculateByBillTotal(billTotal, state.selectedGroupRooms, 0.1);
-
+    
       if (!result) {
         showStatus('本組總用電必須大於 0。', 'error');
         return;
       }
-
+    
       state.selectedGroupRooms = result.rooms;
-
+    
       updateResultTable();
-
+    
       state.calculationResult = {
         location,
         billGroup,
@@ -386,13 +365,13 @@
         remark: el.remark.value.trim(),
         items: state.selectedGroupRooms.map(item => ({ ...item }))
       };
-
+    
       el.groupTotalUsedText.textContent = `${groupTotalUsed} 度`;
       el.billTotalText.textContent = `${Math.round(billTotal)} 元`;
       el.groupTenantTotalText.textContent = `${Math.round(result.total)} 元`;
       el.unitPriceText.textContent = `${result.unitPrice} 元`;
       el.summaryCard.classList.remove('hidden');
-
+    
       showStatus(`整組計算完成，粗估每度 ${result.unitPrice} 元。`, 'success');
     }
 
