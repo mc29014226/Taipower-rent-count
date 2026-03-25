@@ -85,7 +85,7 @@
 
       <div id="summaryCard" class="mt-8 hidden rounded-2xl border border-emerald-200 bg-emerald-50 p-6">
         <h2 class="text-xl font-bold text-emerald-900 mb-4">整組計算結果</h2>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm md:text-base">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm md:text-base">
           <div class="bg-white rounded-xl p-4 border border-emerald-100">
             <div class="text-slate-500">帳單群組總用電</div>
             <div id="groupTotalUsedText" class="text-2xl font-bold text-slate-900 mt-1">0 度</div>
@@ -97,6 +97,10 @@
           <div class="bg-white rounded-xl p-4 border border-emerald-100">
             <div class="text-slate-500">本組應收合計</div>
             <div id="groupTenantTotalText" class="text-2xl font-bold text-emerald-700 mt-1">0 元</div>
+          </div>
+          <div class="bg-white rounded-xl p-4 border border-emerald-100">
+            <div class="text-slate-500">本次每度單價</div>
+            <div id="unitPriceText" class="text-2xl font-bold text-slate-900 mt-1">0 元</div>
           </div>
         </div>
       </div>
@@ -127,6 +131,7 @@
       emptyGroupText: document.getElementById('emptyGroupText'),
       groupTableWrap: document.getElementById('groupTableWrap'),
       groupTableBody: document.getElementById('groupTableBody'),
+      unitPriceText: document.getElementById('unitPriceText')
       summaryCard: document.getElementById('summaryCard'),
       groupTotalUsedText: document.getElementById('groupTotalUsedText'),
       billTotalText: document.getElementById('billTotalText'),
@@ -386,6 +391,48 @@
         .replaceAll("'", '&#039;');
     }
 
+    function calculateByBillTotal(targetTotal, rooms, step = 0.1) {
+      const groupTotalUsed = rooms.reduce((sum, item) => sum + Number(item.usedKwh || 0), 0);
+
+      if (groupTotalUsed <= 0) {
+        return null;
+      }
+
+      let unitPrice = Number((targetTotal / groupTotalUsed).toFixed(1));
+      let bestResult = null;
+
+      for (let i = 0; i < 500; i++) {
+        let total = 0;
+
+        const calculatedRooms = rooms.map(item => {
+          const usageAmount = Math.round(item.usedKwh * unitPrice);
+          const tenantAmount = Math.round(usageAmount + item.publicFee);
+          total += tenantAmount;
+
+          return {
+            ...item,
+            usageAmount,
+            tenantAmount
+          };
+        });
+
+        bestResult = {
+          unitPrice: Number(unitPrice.toFixed(1)),
+          total,
+          diff: total - targetTotal,
+          rooms: calculatedRooms
+        };
+
+        if (total >= targetTotal) {
+          break;
+        }
+
+        unitPrice = Number((unitPrice + step).toFixed(1));
+      }
+
+      return bestResult;
+    }
+
     function calculateGroup() {
       const location = el.locationSelect.value;
       const billGroup = el.billGroupSelect.value;
@@ -429,13 +476,14 @@
         return;
       }
 
-      let groupTenantTotal = 0;
+      const result = calculateByBillTotal(billTotal, state.selectedGroupRooms, 0.1);
 
-      state.selectedGroupRooms.forEach(item => {
-        item.usageAmount = billTotal * (item.usedKwh / groupTotalUsed);
-        item.tenantAmount = Math.round(item.usageAmount + item.publicFee);
-        groupTenantTotal += item.tenantAmount;
-      });
+      if (!result) {
+        showStatus('本組總用電必須大於 0。', 'error');
+        return;
+      }
+
+      state.selectedGroupRooms = result.rooms;
 
       updateResultTable();
 
@@ -444,16 +492,18 @@
         billGroup,
         billTotal,
         groupTotalUsed,
+        unitPrice: result.unitPrice,
         remark: el.remark.value.trim(),
         items: state.selectedGroupRooms.map(item => ({ ...item }))
       };
 
       el.groupTotalUsedText.textContent = `${groupTotalUsed} 度`;
       el.billTotalText.textContent = `${Math.round(billTotal)} 元`;
-      el.groupTenantTotalText.textContent = `${Math.round(groupTenantTotal)} 元`;
+      el.groupTenantTotalText.textContent = `${Math.round(result.total)} 元`;
+      el.unitPriceText.textContent = `${result.unitPrice} 元`;
       el.summaryCard.classList.remove('hidden');
 
-      showStatus('整組分攤計算完成。', 'success');
+      showStatus(`整組計算完成，粗估每度 ${result.unitPrice} 元。`, 'success');
     }
 
     function updateResultTable() {
