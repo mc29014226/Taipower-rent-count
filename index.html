@@ -98,6 +98,10 @@
             <div class="text-slate-500">本組應收合計</div>
             <div id="groupTenantTotalText" class="text-2xl font-bold text-emerald-700 mt-1">0 元</div>
           </div>
+          <div class="bg-white rounded-xl p-4 border border-emerald-100">
+            <div class="text-slate-500">本次每度單價</div>
+            <div id="unitPriceText" class="text-2xl font-bold text-slate-900 mt-1">0 元</div>
+          </div>
         </div>
       </div>
     </div>
@@ -131,6 +135,7 @@
       groupTotalUsedText: document.getElementById('groupTotalUsedText'),
       billTotalText: document.getElementById('billTotalText'),
       groupTenantTotalText: document.getElementById('groupTenantTotalText')
+      unitPriceText: document.getElementById('unitPriceText')
     };
 
     function ensureAdminPassword() {
@@ -386,7 +391,50 @@
         .replaceAll("'", '&#039;');
     }
 
-    function calculateByUnitPrice(targetTotal, rooms, startPrice = 4.2, step = 0.1) {n      let unitPrice = startPrice;n      let total = 0;n      while (true) {n        total = rooms.reduce((sum, r) => sum + Math.round(r.usedKwh * unitPrice) + r.publicFee, 0);n        if (total >= targetTotal || unitPrice > 10) break;n        unitPrice = Number((unitPrice + step).toFixed(1));n      }n      rooms.forEach(r => {n        r.usageAmount = Math.round(r.usedKwh * unitPrice);n        r.tenantAmount = r.usageAmount + r.publicFee;n      });n      return { unitPrice, total, rooms };n    }nn    function calculateGroup() {n      const billTotal = Number(document.getElementById("billTotal").value);n      if (!billTotal) return alert("請輸入台電總金額");n      if (state.selectedGroupRooms.length === 0) return alert("請先載入群組資料");nn      const result = calculateByUnitPrice(billTotal, state.selectedGroupRooms);n      state.selectedGroupRooms = result.rooms;nn      updateResultTable();n      n      document.getElementById("groupTotalUsedText").textContent = state.selectedGroupRooms.reduce((s, r) => s + r.usedKwh, 0) + " 度";n      document.getElementById("billTotalText").textContent = billTotal + " 元 (最終單價: " + result.unitPrice + ")";n      document.getElementById("groupTenantTotalText").textContent = result.total + " 元";n      document.getElementById("summaryCard").classList.remove("hidden");n      showStatus("整組計算完成，最終每度 " + result.unitPrice + " 元", "success");n    }
+    function calculateByBillTotal(targetTotal, rooms, step = 0.1) {
+      const groupTotalUsed = rooms.reduce((sum, item) => sum + Number(item.usedKwh || 0), 0);
+    
+      if (groupTotalUsed <= 0) {
+        return null;
+      }
+    
+      // 先用台電總額 / 總用電，粗估本期每度單價
+      let unitPrice = Number((targetTotal / groupTotalUsed).toFixed(1));
+    
+      let bestResult = null;
+    
+      for (let i = 0; i < 500; i++) {
+        let total = 0;
+    
+        const calculatedRooms = rooms.map(item => {
+          const usageAmount = Math.round(item.usedKwh * unitPrice);
+          const tenantAmount = Math.round(usageAmount + item.publicFee);
+          total += tenantAmount;
+    
+          return {
+            ...item,
+            usageAmount,
+            tenantAmount
+          };
+        });
+    
+        bestResult = {
+          unitPrice: Number(unitPrice.toFixed(1)),
+          total,
+          diff: total - targetTotal,
+          rooms: calculatedRooms
+        };
+    
+        // 找到第一個不低於台電總額的結果就停止
+        if (total >= targetTotal) {
+          break;
+        }
+    
+        unitPrice = Number((unitPrice + step).toFixed(1));
+      }
+    
+      return bestResult;
+    }
       if (!billGroup) {
         showStatus('請先選擇帳單群組。', 'error');
         return;
@@ -419,14 +467,6 @@
         showStatus('本組總用電必須大於 0。', 'error');
         return;
       }
-
-      let groupTenantTotal = 0;
-
-      state.selectedGroupRooms.forEach(item => {
-        item.usageAmount = billTotal * (item.usedKwh / groupTotalUsed);
-        item.tenantAmount = Math.round(item.usageAmount + item.publicFee);
-        groupTenantTotal += item.tenantAmount;
-      });
 
       updateResultTable();
 
