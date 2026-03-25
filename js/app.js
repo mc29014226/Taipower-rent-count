@@ -1,12 +1,8 @@
+    import { state } from './state.js';
+    import { calculateByBillTotal, validateCalculationInput } from './calculator.js';
+
     const GAS_URL = 'https://script.google.com/macros/s/AKfycbzW-Cv2scTGNwTv68xGhIpvYy5m0Hfn-bwWsLeRKdIRLnPuaooK8jRS4uiy6WTQnW4aXg/exec';
     let adminPassword = sessionStorage.getItem('adminPassword') || '';
-
-    const state = {
-      assets: [],
-      latestReadings: [],
-      selectedGroupRooms: [],
-      calculationResult: null
-    };
 
     const el = {
       locationSelect: document.getElementById('locationSelect'),
@@ -279,48 +275,6 @@
         .replaceAll('>', '&gt;')
         .replaceAll('"', '&quot;')
         .replaceAll("'", '&#039;');
-    }
-
-    function calculateByBillTotal(targetTotal, rooms, step = 0.1) {
-      const groupTotalUsed = rooms.reduce((sum, item) => sum + Number(item.usedKwh || 0), 0);
-
-      if (groupTotalUsed <= 0) {
-        return null;
-      }
-
-      let unitPrice = Number((targetTotal / groupTotalUsed).toFixed(1));
-      let bestResult = null;
-
-      for (let i = 0; i < 500; i++) {
-        let total = 0;
-
-        const calculatedRooms = rooms.map(item => {
-          const usageAmount = Math.round(item.usedKwh * unitPrice);
-          const tenantAmount = Math.round(usageAmount + item.publicFee);
-          total += tenantAmount;
-
-          return {
-            ...item,
-            usageAmount,
-            tenantAmount
-          };
-        });
-
-        bestResult = {
-          unitPrice: Number(unitPrice.toFixed(1)),
-          total,
-          diff: total - targetTotal,
-          rooms: calculatedRooms
-        };
-
-        if (total >= targetTotal) {
-          break;
-        }
-
-        unitPrice = Number((unitPrice + step).toFixed(1));
-      }
-
-      return bestResult;
     }
 
     function calculateGroup() {
