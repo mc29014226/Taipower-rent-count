@@ -86,16 +86,7 @@
     });
 
     function calculate() {
-      const target = Number(el.billTotal.value);
-      if (!target) return alert('請輸入帳單金額');
-      let price = 0.1;
-      let totalColl = 0;
-      const rooms = state.selectedGroupRooms;
-      while (true) {
-        totalColl = rooms.reduce((sum, r) => sum + Math.round(r.usedKwh * price) + r.publicFee, 0);
-        if (totalColl >= target || price > 10) break;
-        price = Number((price + 0.1).toFixed(1));
-      }
+      const billTotal = Number(document.getElementById("billTotal").value); if (!billTotal) return alert("請輸入台電總金額"); let unitPrice = 4.0; let totalColl = 0; while (true) { totalColl = state.selectedGroupRooms.reduce((sum, r) => { const usage = Math.round(r.usedKwh * unitPrice); return sum + usage + r.publicFee; }, 0); if (totalColl >= billTotal || unitPrice > 10) break; unitPrice = Number((unitPrice + 0.1).toFixed(1)); } state.selectedGroupRooms.forEach((r, i) => { const row = document.getElementById("groupTableBody").querySelectorAll("tr")[i]; const usageAmount = Math.round(r.usedKwh * unitPrice); r.tenantAmount = usageAmount + r.publicFee; row.querySelector(".usage-cell").textContent = usageAmount; row.querySelector(".tenant-cell").textContent = r.tenantAmount; }); document.getElementById("groupTotalUsedText").textContent = state.selectedGroupRooms.reduce((s, r) => s + r.usedKwh, 0) + " 度"; document.getElementById("billTotalText").textContent = billTotal + " 元 (最終單價: " + unitPrice + ")"; document.getElementById("groupTenantTotalText").textContent = totalColl + " 元"; document.getElementById("summaryCard").classList.remove("hidden"); return;
       state.finalPrice = price;
       rooms.forEach((r, i) => {
         const row = el.groupTableBody.querySelectorAll('tr')[i];
