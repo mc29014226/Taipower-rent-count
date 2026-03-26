@@ -1,0 +1,6 @@
+showStatus
+renderLocations
+renderBillGroups
+renderGroupRooms
+updateResultTable
+clearGroupTable
