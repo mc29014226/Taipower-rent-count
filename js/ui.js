@@ -181,7 +181,6 @@ export function createUI({ state, el, onAutoRecalculate }) {
             class="group-current-kwh w-32 rounded-lg border border-slate-300 px-3 py-2"
             data-index="${index}"
             value="${item.currentKwh}"
-            placeholder="輸入本期度數"
           />
         </td>
         <td class="px-4 py-3 border-b used-kwh-cell">0</td>
