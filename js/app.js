@@ -45,6 +45,36 @@ function ensureAdminPassword() {
   return true;
 }
 
+async function verifySetupAccess() {
+  const input = prompt('請輸入管理密碼');
+  if (!input) return;
+
+  try {
+    const response = await fetch(GAS_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'text/plain;charset=utf-8'
+      },
+      body: JSON.stringify({
+        action: 'verifyAdminPassword',
+        password: input.trim()
+      })
+    });
+
+    const result = await response.json();
+
+    if (result.success) {
+      sessionStorage.setItem('adminPassword', input.trim());
+      window.location.href = './setup.html';
+      return;
+    }
+
+    ui.showStatus('管理密碼錯誤，無法進入設定頁。', 'error');
+  } catch (error) {
+    ui.showStatus(`驗證失敗：${error.message}`, 'error');
+  }
+}
+
 async function loadCloudDataHandler() {
   try {
     const data = await loadCloudData();
