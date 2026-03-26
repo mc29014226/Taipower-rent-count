@@ -149,7 +149,7 @@ export function createUI({ state, el, onAutoRecalculate }) {
           room: item.room,
           billGroup: item.billGroup,
           previousKwh,
-          currentKwh: '',
+          currentKwh: previousKwh,
           usedKwh: 0,
           publicFee: Number(item.publicFee || 0),
           usageAmount: 0,
@@ -180,6 +180,7 @@ export function createUI({ state, el, onAutoRecalculate }) {
             step="1"
             class="group-current-kwh w-32 rounded-lg border border-slate-300 px-3 py-2"
             data-index="${index}"
+            value="${item.currentKwh}"
             placeholder="輸入本期度數"
           />
         </td>
