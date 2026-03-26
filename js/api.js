@@ -1,4 +1,4 @@
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbzW-Cv2scTGNwTv68xGhIpvYy5m0Hfn-bwWsLeRKdIRLnPuaooK8jRS4uiy6WTQnW4aXg/exec';
+export const GAS_URL = 'https://script.google.com/macros/s/AKfycbzW-Cv2scTGNwTv68xGhIpvYy5m0Hfn-bwWsLeRKdIRLnPuaooK8jRS4uiy6WTQnW4aXg/exec';
 
 export function normalizeAsset(item) {
   return {
@@ -32,8 +32,24 @@ export async function fetchJson(url) {
   try {
     return JSON.parse(text);
   } catch {
-    throw new Error(`JSON解析失敗`);
+    throw new Error('JSON解析失敗');
   }
+}
+
+export async function verifyAdminPassword(password) {
+  const response = await fetch(GAS_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'text/plain;charset=utf-8'
+    },
+    body: JSON.stringify({
+      action: 'verifyAdminPassword',
+      password: String(password || '').trim()
+    })
+  });
+
+  const result = await response.json();
+  return !!result.success;
 }
 
 export async function loadCloudData() {
@@ -67,6 +83,9 @@ export async function syncGroupRecords(calculationResult, adminPassword) {
 
     const response = await fetch(GAS_URL, {
       method: 'POST',
+      headers: {
+        'Content-Type': 'text/plain;charset=utf-8'
+      },
       body: JSON.stringify(payload)
     });
 
