@@ -90,62 +90,6 @@
     const STORAGE_KEY = 'assets';
     let adminPassword = sessionStorage.getItem('adminPassword') || '';
 
-    async function verifyAdminPassword(password) {
-      const response = await fetch(GAS_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'text/plain;charset=utf-8'
-        },
-        body: JSON.stringify({
-          action: 'verifyAdminPassword',
-          password: String(password || '').trim()
-        })
-      });
-    
-      const result = await response.json();
-      return !!result.success;
-    }
-    
-    async function ensureAdminPassword() {
-      if (adminPassword) {
-        const ok = await verifyAdminPassword(adminPassword);
-        if (ok) return true;
-    
-        adminPassword = '';
-        sessionStorage.removeItem('adminPassword');
-      }
-    
-      const input = prompt('請輸入管理密碼');
-      if (!input) {
-        showStatus('未輸入管理密碼。', 'warning');
-        return false;
-      }
-    
-      const password = input.trim();
-      const ok = await verifyAdminPassword(password);
-    
-      if (!ok) {
-        showStatus('管理密碼錯誤。', 'error');
-        return false;
-      }
-    
-      adminPassword = password;
-      sessionStorage.setItem('adminPassword', adminPassword);
-      return true;
-    }
-    
-    async function guardSetupPage() {
-      const ok = await ensureAdminPassword();
-    
-      if (!ok) {
-        alert('請先輸入正確的管理密碼');
-        window.location.href = './index.html';
-        return false;
-      }
-    
-      return true;
-    }
-
     const el = {
       loc: document.getElementById('loc'),
       room: document.getElementById('room'),
@@ -167,31 +111,59 @@
     let latestReadings = [];
     let editIndex = -1;
 
+    async function verifyAdminPassword(password) {
+      const response = await fetch(GAS_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'text/plain;charset=utf-8'
+        },
+        body: JSON.stringify({
+          action: 'verifyAdminPassword',
+          password: String(password || '').trim()
+        })
+      });
+
+      const result = await response.json();
+      return !!result.success;
+    }
+
     async function ensureAdminPassword() {
       if (adminPassword) {
         const ok = await verifyAdminPassword(adminPassword);
         if (ok) return true;
-    
+
         adminPassword = '';
         sessionStorage.removeItem('adminPassword');
       }
-    
+
       const input = prompt('請輸入管理密碼');
       if (!input) {
         showStatus('未輸入管理密碼。', 'warning');
         return false;
       }
-    
+
       const password = input.trim();
       const ok = await verifyAdminPassword(password);
-    
+
       if (!ok) {
         showStatus('管理密碼錯誤。', 'error');
         return false;
       }
-    
+
       adminPassword = password;
       sessionStorage.setItem('adminPassword', adminPassword);
+      return true;
+    }
+
+    async function guardSetupPage() {
+      const ok = await ensureAdminPassword();
+
+      if (!ok) {
+        alert('請先輸入正確的管理密碼');
+        window.location.href = './index.html';
+        return false;
+      }
+
       return true;
     }
 
@@ -259,11 +231,11 @@
         r.room === item.room &&
         r.billGroup === item.billGroup
       );
-    
+
       if (latest) {
         return Number(latest.currentKwh || latest.lastKwh || 0);
       }
-    
+
       return Number(item.lastKwh || 0);
     }
 
@@ -488,22 +460,22 @@
       showStatus('資料已刪除。', 'success');
     }
 
-  async function loadFromCloud() {
+    async function loadFromCloud() {
       try {
         el.reloadBtn.disabled = true;
         el.reloadBtn.textContent = '載入中...';
-    
+
         const [assetsResponse, latestResponse] = await Promise.all([
           fetch(`${GAS_URL}?action=getAssets`),
           fetch(`${GAS_URL}?action=getLatestReadings`)
         ]);
-    
+
         const assetsResult = await assetsResponse.json();
         const latestResult = await latestResponse.json();
-    
+
         data = Array.isArray(assetsResult.data) ? assetsResult.data.map(normalizeItem) : [];
         latestReadings = Array.isArray(latestResult.data) ? latestResult.data.map(normalizeLatest) : [];
-    
+
         saveLocal();
         clearForm();
         renderLocationFilter();
@@ -515,12 +487,12 @@
         el.reloadBtn.disabled = false;
         el.reloadBtn.textContent = '重新從雲端載入';
       }
-  }
+    }
 
     async function syncToCloud() {
       try {
         if (!(await ensureAdminPassword())) return;
-        
+
         el.syncBtn.disabled = true;
         el.syncBtn.textContent = '同步中...';
 
@@ -552,18 +524,6 @@
       }
     }
 
-    async function guardSetupPage() {
-      const ok = await ensureAdminPassword();
-    
-      if (!ok) {
-        alert('請先輸入正確的管理密碼');
-        window.location.href = './index.html';
-        return false;
-      }
-    
-      return true;
-    }
-
     function bindEvents() {
       el.saveBtn.addEventListener('click', addOrUpdate);
       el.clearBtn.addEventListener('click', () => {
@@ -575,16 +535,16 @@
       el.locationFilter.addEventListener('change', renderList);
     }
 
-  async function init() {
-    const passed = await guardSetupPage();
-    if (!passed) return;
-  
-    bindEvents();
-    renderLocationFilter();
-    renderList();
-    showStatus('正在載入雲端資料...', 'info');
-    await loadFromCloud();
-  }
+    async function init() {
+      const passed = await guardSetupPage();
+      if (!passed) return;
+
+      bindEvents();
+      renderLocationFilter();
+      renderList();
+      showStatus('正在載入雲端資料...', 'info');
+      await loadFromCloud();
+    }
 
     init();
   </script>
