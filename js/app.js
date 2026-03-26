@@ -1,7 +1,7 @@
 import { state } from './state.js';
 import { calculateByBillTotal, validateCalculationInput } from './calculator.js';
 import { createUI } from './ui.js';
-import { loadCloudData, syncGroupRecords } from './api.js';
+import { loadCloudData, syncGroupRecords, verifyAdminPassword } from './api.js';
 
 let adminPassword = sessionStorage.getItem('adminPassword') || '';
 
@@ -50,21 +50,11 @@ async function verifySetupAccess() {
   if (!input) return;
 
   try {
-    const response = await fetch(GAS_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'text/plain;charset=utf-8'
-      },
-      body: JSON.stringify({
-        action: 'verifyAdminPassword',
-        password: input.trim()
-      })
-    });
+    const ok = await verifyAdminPassword(input.trim());
 
-    const result = await response.json();
-
-    if (result.success) {
-      sessionStorage.setItem('adminPassword', input.trim());
+    if (ok) {
+      adminPassword = input.trim();
+      sessionStorage.setItem('adminPassword', adminPassword);
       window.location.href = './setup.html';
       return;
     }
