@@ -90,6 +90,62 @@
     const STORAGE_KEY = 'assets';
     let adminPassword = sessionStorage.getItem('adminPassword') || '';
 
+    async function verifyAdminPassword(password) {
+      const response = await fetch(GAS_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'text/plain;charset=utf-8'
+        },
+        body: JSON.stringify({
+          action: 'verifyAdminPassword',
+          password: String(password || '').trim()
+        })
+      });
+    
+      const result = await response.json();
+      return !!result.success;
+    }
+    
+    async function ensureAdminPassword() {
+      if (adminPassword) {
+        const ok = await verifyAdminPassword(adminPassword);
+        if (ok) return true;
+    
+        adminPassword = '';
+        sessionStorage.removeItem('adminPassword');
+      }
+    
+      const input = prompt('請輸入管理密碼');
+      if (!input) {
+        showStatus('未輸入管理密碼。', 'warning');
+        return false;
+      }
+    
+      const password = input.trim();
+      const ok = await verifyAdminPassword(password);
+    
+      if (!ok) {
+        showStatus('管理密碼錯誤。', 'error');
+        return false;
+      }
+    
+      adminPassword = password;
+      sessionStorage.setItem('adminPassword', adminPassword);
+      return true;
+    }
+    
+    async function guardSetupPage() {
+      const ok = await ensureAdminPassword();
+    
+      if (!ok) {
+        alert('請先輸入正確的管理密碼');
+        window.location.href = './index.html';
+        return false;
+      }
+    
+      return true;
+    }
+
     const el = {
       loc: document.getElementById('loc'),
       room: document.getElementById('room'),
@@ -111,8 +167,14 @@
     let latestReadings = [];
     let editIndex = -1;
 
-    function ensureAdminPassword() {
-      if (adminPassword) return true;
+    async function ensureAdminPassword() {
+      if (adminPassword) {
+        const ok = await verifyAdminPassword(adminPassword);
+        if (ok) return true;
+    
+        adminPassword = '';
+        sessionStorage.removeItem('adminPassword');
+      }
     
       const input = prompt('請輸入管理密碼');
       if (!input) {
@@ -120,7 +182,15 @@
         return false;
       }
     
-      adminPassword = input.trim();
+      const password = input.trim();
+      const ok = await verifyAdminPassword(password);
+    
+      if (!ok) {
+        showStatus('管理密碼錯誤。', 'error');
+        return false;
+      }
+    
+      adminPassword = password;
       sessionStorage.setItem('adminPassword', adminPassword);
       return true;
     }
@@ -449,7 +519,7 @@
 
     async function syncToCloud() {
       try {
-        if (!ensureAdminPassword()) return;
+        if (!(await ensureAdminPassword())) return;
         
         el.syncBtn.disabled = true;
         el.syncBtn.textContent = '同步中...';
@@ -482,6 +552,18 @@
       }
     }
 
+    async function guardSetupPage() {
+      const ok = await ensureAdminPassword();
+    
+      if (!ok) {
+        alert('請先輸入正確的管理密碼');
+        window.location.href = './index.html';
+        return false;
+      }
+    
+      return true;
+    }
+
     function bindEvents() {
       el.saveBtn.addEventListener('click', addOrUpdate);
       el.clearBtn.addEventListener('click', () => {
@@ -494,6 +576,9 @@
     }
 
   async function init() {
+    const passed = await guardSetupPage();
+    if (!passed) return;
+  
     bindEvents();
     renderLocationFilter();
     renderList();
