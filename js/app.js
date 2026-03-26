@@ -1,8 +1,7 @@
 import { state } from './state.js';
 import { calculateByBillTotal, validateCalculationInput } from './calculator.js';
 import { createUI } from './ui.js';
-
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbzW-Cv2scTGNwTv68xGhIpvYy5m0Hfn-bwWsLeRKdIRLnPuaooK8jRS4uiy6WTQnW4aXg/exec';
+import { loadCloudData, syncGroupRecords } from './api.js';
 
 let adminPassword = sessionStorage.getItem('adminPassword') || '';
 
@@ -46,47 +45,12 @@ function ensureAdminPassword() {
   return true;
 }
 
-function normalizeAsset(item) {
-  return {
-    location: String(item.location || '').trim(),
-    room: String(item.room || '').trim(),
-    billGroup: String(item.billGroup || '').trim(),
-    lastKwh: Number(item.lastKwh || 0),
-    publicFee: Number(item.publicFee || 0)
-  };
-}
-
-function normalizeLatest(item) {
-  return {
-    location: String(item.location || '').trim(),
-    room: String(item.room || '').trim(),
-    billGroup: String(item.billGroup || '').trim(),
-    currentKwh: Number(item.currentKwh || item.lastKwh || 0),
-    lastKwh: Number(item.lastKwh || 0),
-    updatedAt: String(item.updatedAt || '').trim()
-  };
-}
-
-async function fetchJson(url) {
-  const response = await fetch(url);
-  const text = await response.text();
-
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}`);
-  }
-
-  return JSON.parse(text);
-}
-
-async function loadCloudData() {
+async function loadCloudDataHandler() {
   try {
-    const [assetsRes, latestRes] = await Promise.all([
-      fetchJson(`${GAS_URL}?action=getAssets`),
-      fetchJson(`${GAS_URL}?action=getLatestReadings`)
-    ]);
+    const data = await loadCloudData();
 
-    state.assets = Array.isArray(assetsRes.data) ? assetsRes.data.map(normalizeAsset) : [];
-    state.latestReadings = Array.isArray(latestRes.data) ? latestRes.data.map(normalizeLatest) : [];
+    state.assets = data.assets;
+    state.latestReadings = data.latestReadings;
 
     ui.renderLocations();
     ui.resetBillGroups();
@@ -151,7 +115,7 @@ function calculateGroup() {
   ui.showStatus(`整組計算完成，粗估每度 ${result.unitPrice} 元。`, 'success');
 }
 
-async function syncGroupRecords() {
+async function syncGroupRecordsHandler() {
   if (!state.calculationResult) {
     ui.showStatus('請先完成整組分攤計算。', 'error');
     return;
@@ -163,17 +127,7 @@ async function syncGroupRecords() {
     el.syncBtn.disabled = true;
     el.syncBtn.textContent = '同步中...';
 
-    for (const item of state.calculationResult.items) {
-      await fetch(GAS_URL, {
-        method: 'POST',
-        body: JSON.stringify({
-          action: 'saveMeterRecord',
-          adminPassword,
-          ...item,
-          billTotal: state.calculationResult.billTotal
-        })
-      });
-    }
+    await syncGroupRecords(state.calculationResult, adminPassword);
 
     ui.showStatus('同步成功', 'success');
   } catch (error) {
@@ -187,24 +141,26 @@ async function syncGroupRecords() {
 function bindEvents() {
   el.locationSelect.addEventListener('change', () => {
     const location = el.locationSelect.value;
+
     if (!location) {
       ui.resetBillGroups();
       ui.clearGroupTable();
       return;
     }
+
     ui.renderBillGroups(location);
     ui.clearGroupTable();
   });
 
   el.billGroupSelect.addEventListener('change', ui.renderGroupRooms);
   el.calculateBtn.addEventListener('click', calculateGroup);
-  el.syncBtn.addEventListener('click', syncGroupRecords);
-  el.reloadBtn.addEventListener('click', loadCloudData);
+  el.syncBtn.addEventListener('click', syncGroupRecordsHandler);
+  el.reloadBtn.addEventListener('click', loadCloudDataHandler);
 }
 
 async function init() {
   bindEvents();
-  await loadCloudData();
+  await loadCloudDataHandler();
 }
 
 init();
